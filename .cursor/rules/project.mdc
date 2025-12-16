@@ -1,0 +1,511 @@
+---
+description: UI Sample Admin プロジェクトの開発ルール・コーディング規約
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+alwaysApply: true
+---
+
+# UI Sample Admin - Project Rules
+
+> React Admin管理画面ボイラープレート開発時のAIコーディングアシスタント向けコンテキスト
+
+---
+
+## 🎯 Project Identity
+
+| 項目 | 内容 |
+|------|------|
+| **名称** | UI Sample Admin |
+| **目的** | エンタープライズ級管理画面の高速構築 |
+| **アーキテクチャ** | React 19 + shadcn/ui + React Admin + Zustand + Hono |
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+
+| カテゴリ | 技術 | バージョン | 用途 |
+|---------|------|-----------|------|
+| **Core** | React | ^19.1.0 | UIフレームワーク |
+| **Core** | TypeScript | ~5.9.3 | 型安全性（strict mode） |
+| **Core** | tsgo | 7.0.0-dev | 高速型チェック（Go native） |
+| **Core** | Vite | ^7.1.6 | ビルドツール |
+| **UI** | shadcn/ui | - | Radix UIベースコンポーネント |
+| **UI** | Tailwind CSS | ^4.1.18 | スタイリング（CSS-first config） |
+| **UI** | React Admin | ^5.11.3 | 管理画面フレームワーク |
+| **State** | Zustand | ^5.0.8 | クライアント状態管理 |
+| **State** | TanStack Query | ^5.89.0 | サーバー状態管理 |
+| **Form** | React Hook Form | ^7.62.0 | フォーム管理 |
+| **Schema** | Zod | ^4.2.1 | スキーマバリデーション |
+| **Quality** | Biome | ^2.2.4 | Lint + Format |
+| **Test** | Vitest | ^4.0.16 | テスト |
+
+### Backend
+
+| カテゴリ | 技術 | バージョン | 用途 |
+|---------|------|-----------|------|
+| **Core** | Hono | ^4.7.x | 軽量・高速Webフレームワーク |
+| **Core** | TypeScript | ~5.9.3 | 型安全性（strict mode） |
+| **Schema** | @hono/zod-openapi | ^1.1.5 | Zodスキーマ + OpenAPI統合 |
+| **Validation** | Zod | ^4.2.1 | スキーマバリデーション |
+| **RPC** | hono/client | - | 型安全なクライアント通信 |
+| **Runtime** | Node.js | ^22.x | 実行環境（tsx使用） |
+
+---
+
+## ⚠️ 重要な技術的変更点
+
+### TypeScript 7 (tsgo) の破壊的変更
+
+```typescript
+// ❌ 廃止されたオプション（tsconfig.json）
+{
+  "compilerOptions": {
+    "baseUrl": "."  // TS7で削除
+  }
+}
+
+// ✅ pathsのみで動作
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+```
+
+### Tailwind CSS v4 の設定方式
+
+```css
+/* src/index.css - CSS-first configuration */
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+@theme {
+  --color-primary: hsl(var(--primary));
+  --color-background: hsl(var(--background));
+  /* ... */
+}
+```
+
+> 📝 `tailwind.config.js` は不要。すべてCSSファイル内で設定。
+
+---
+
+## 🚫 FORBIDDEN - 絶対禁止
+
+### any型の使用禁止
+
+```typescript
+// ❌ BAD
+const data: any = fetchData();
+
+// ✅ GOOD
+const data = UserSchema.parse(await fetchData());
+```
+
+### 直接的な型定義（Zodスキーマなし）禁止
+
+```typescript
+// ❌ BAD
+interface User {
+  id: string;
+  name: string;
+}
+
+// ✅ GOOD
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+type User = z.infer<typeof UserSchema>;
+```
+
+### let宣言禁止（参照透過性違反）
+
+```typescript
+// ❌ BAD
+let count = 0;
+count++;
+
+// ✅ GOOD
+const newCount = count + 1;
+const newItems = [...items, newItem];
+```
+
+### コンポーネント内での直接モックデータ定義禁止
+
+```typescript
+// ❌ BAD
+const UserList = () => {
+  const mockUsers = [{ id: 1, name: "テスト" }];
+  return <UserTable data={mockUsers} />;
+};
+
+// ✅ GOOD - Zustandストア経由
+const UserList = () => {
+  const { users } = useUserStore();
+  return <UserTable data={users} />;
+};
+```
+
+### バックエンドでの型安全でないルート定義禁止
+
+```typescript
+// ❌ BAD
+app.get('/users/:id', (c) => {
+  const id = c.req.param('id'); // 型がstring | undefined
+  return c.json({ id });
+});
+
+// ❌ BAD - バリデーションなし
+app.post('/users', async (c) => {
+  const body = await c.req.json(); // any型
+  return c.json(body);
+});
+```
+
+---
+
+## ✅ REQUIRED - 必須パターン
+
+### Pattern 1: Zodスキーマファースト
+
+```typescript
+// shared/schemas.ts
+import { z } from 'zod';
+
+export const UserSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  email: z.string().email(),
+  status: z.enum(['active', 'inactive', 'pending']),
+  createdAt: z.coerce.date(),
+});
+
+export type User = z.infer<typeof UserSchema>;
+
+// 作成用スキーマ（idとcreatedAtを除外）
+export const CreateUserSchema = UserSchema.omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+```
+
+### Pattern 2: Zustandストア定義
+
+```typescript
+// stores/userStore.ts
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+import type { User, CreateUser } from '@/shared/schemas';
+
+interface UserStore {
+  users: User[];
+  isLoading: boolean;
+  getUsers: () => User[];
+  addUser: (user: CreateUser) => void;
+  updateUser: (id: string, updates: Partial<User>) => void;
+  deleteUser: (id: string) => void;
+}
+
+export const useUserStore = create<UserStore>()(
+  devtools(
+    (set, get) => ({
+      users: [],
+      isLoading: false,
+      getUsers: () => get().users,
+      addUser: (item) => {
+        const newUser = { ...item, id: crypto.randomUUID(), createdAt: new Date() };
+        set((state) => ({ users: [...state.users, newUser] }));
+      },
+      updateUser: (id, updates) => {
+        set((state) => ({
+          users: state.users.map((user) => 
+            user.id === id ? { ...user, ...updates } : user
+          ),
+        }));
+      },
+      deleteUser: (id) => {
+        set((state) => ({ users: state.users.filter((user) => user.id !== id) }));
+      },
+    }),
+    { name: 'user-store' }
+  )
+);
+```
+
+### Pattern 3: フォーム実装（React Hook Form + Zod）
+
+```typescript
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { CreateUserSchema, type CreateUser } from '@/shared/schemas';
+
+const UserForm: React.FC = () => {
+  const { addUser } = useUserStore();
+  const form = useForm<CreateUser>({
+    resolver: zodResolver(CreateUserSchema),
+    defaultValues: { name: '', email: '', status: 'pending' },
+  });
+
+  const onSubmit = (data: CreateUser) => {
+    addUser(data);
+    form.reset();
+  };
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)}>
+      {/* フォームフィールド */}
+    </form>
+  );
+};
+```
+
+### Pattern 4: Hono APIルート定義（@hono/zod-openapi v1.x）
+
+```typescript
+// api/routes/users/routes.ts
+import { createRoute, z } from '@hono/zod-openapi';
+import { UserSchema, CreateUserSchema } from '@/shared/schemas';
+
+export const listUsersRoute = createRoute({
+  method: 'get',
+  path: '/users',
+  tags: ['users'],
+  summary: 'ユーザー一覧取得',
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.object({ users: z.array(UserSchema) }),
+        },
+      },
+      description: 'ユーザー一覧',
+    },
+  },
+});
+
+export const createUserRoute = createRoute({
+  method: 'post',
+  path: '/users',
+  tags: ['users'],
+  summary: 'ユーザー作成',
+  request: {
+    body: {
+      content: { 'application/json': { schema: CreateUserSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { 'application/json': { schema: UserSchema } },
+      description: '作成されたユーザー',
+    },
+  },
+});
+```
+
+### Pattern 5: Hono RPCクライアント（フロントエンド連携）
+
+```typescript
+// lib/apiClient.ts
+import { hc } from 'hono/client';
+import type { AppType } from '../api';
+
+export const apiClient = hc<AppType>('http://localhost:3000');
+
+// hooks/useApiUsers.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+export const useApiUsers = () => 
+  useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const res = await apiClient.api.v1.users.$get();
+      if (!res.ok) throw new Error('Failed to fetch users');
+      return res.json();
+    },
+  });
+
+export const useCreateUser = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: CreateUser) => {
+      const res = await apiClient.api.v1.users.$post({ json: data });
+      if (!res.ok) throw new Error('Failed to create user');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+};
+```
+
+---
+
+## 📁 Naming Conventions
+
+| 種類 | 規則 | 例 |
+|------|------|-----|
+| **コンポーネント** | `PascalCase.tsx` | `UserList.tsx` |
+| **ユーティリティ** | `camelCase.ts` | `formatDate.ts` |
+| **ストア** | `camelCaseStore.ts` | `userStore.ts` |
+| **スキーマ** | `schemas.ts` / `*.schema.ts` | `user.schema.ts` |
+| **テスト** | `*.test.ts` / `*.test.tsx` | `UserList.test.tsx` |
+| **ファイル名** | 最大4単語連結 | `userListTable.tsx` |
+| **Gitブランチ** | 最大4単語連結 | `feature/user-list-table` |
+
+---
+
+## 🔧 Import Rules
+
+```typescript
+// ✅ パスエイリアス使用
+import { Button } from '@/components/ui/button';
+import { useUserStore } from '@/stores';
+
+// ✅ 一括インポート（UIコンポーネント）
+import { Button, Card, Dialog } from '@/components/ui';
+
+// ✅ 管理画面コンポーネント
+import { AdminApp, Dashboard } from '@/components';
+```
+
+---
+
+## 📊 State Management Guidelines
+
+| 状態の種類 | 管理方法 | 具体例 |
+|-----------|---------|--------|
+| **クライアント状態** | Zustand | サイドバー開閉、選択中タブ、モーダル表示、テーマ設定 |
+| **サーバー状態** | TanStack Query | API取得データ、キャッシュ、ローディング/エラー状態 |
+| **フォーム状態** | React Hook Form | 入力値、バリデーション結果、送信状態 |
+
+> ⚠️ `useState` はコンポーネント固有の一時的なUI状態（ホバー状態など）にのみ使用可。共有される状態は必ずZustandストアへ。
+
+---
+
+## 📂 Directory Structure
+
+```
+project-root/
+├── src/                        # フロントエンド
+│   ├── components/
+│   │   ├── admin/              # 管理画面コンポーネント
+│   │   └── ui/                 # shadcn/ui コンポーネント
+│   ├── stores/                 # Zustand ストア
+│   ├── hooks/                  # カスタムフック（API連携含む）
+│   ├── lib/
+│   │   ├── utils.ts
+│   │   └── apiClient.ts        # Hono RPCクライアント
+│   ├── index.css               # Tailwind v4 設定（@theme）
+│   └── testing/
+│
+├── api/                        # バックエンド（Hono）
+│   ├── index.ts                # メインアプリ（AppType export）
+│   ├── server.ts               # サーバー起動エントリーポイント
+│   ├── routes/                 # APIルート
+│   ├── services/               # ビジネスロジック
+│   └── middleware/             # カスタムミドルウェア
+│
+└── shared/                     # フロント/バック共通
+    └── schemas.ts              # Zodスキーマ（型定義の単一ソース）
+```
+
+> 🔑 **Key Point**: `shared/schemas.ts` がフロントエンド/バックエンド両方から参照される型の単一ソース
+
+---
+
+## ✅ Quality Gates
+
+コミット前に必ず実行：
+
+```bash
+pnpm typecheck && pnpm lint && pnpm test && pnpm build
+```
+
+**全てパスしない限りコミット禁止** 🚫
+
+> 💡 `pnpm typecheck` は tsgo（Go native）で高速実行。互換用に `pnpm typecheck:tsc` も使用可。
+
+---
+
+## 🎨 UI Components (shadcn/ui)
+
+### カテゴリ別
+
+| カテゴリ | コンポーネント |
+|---------|---------------|
+| **Form** | Button, Input, Label, Textarea, Checkbox, Switch |
+| **Layout** | Card, Tabs, Sidebar, NavigationMenu |
+| **Data** | Table, Badge, Avatar, Progress |
+| **Overlay** | Dialog, Sheet, Popover, Tooltip |
+| **Menu** | DropdownMenu, ContextMenu, Command |
+| **Admin** | AdminApp, AppSidebar, AppNavbar, Dashboard, DataTable |
+
+---
+
+## 🔧 Configuration Files
+
+| ファイル | 用途 |
+|---------|------|
+| `tsconfig.json` | TypeScript基本設定 |
+| `tsconfig.app.json` | フロントエンド用TS設定 |
+| `tsconfig.node.json` | バックエンド/ビルドツール用TS設定 |
+| `vite.config.ts` | Vite設定（パスエイリアス、@tailwindcss/vite） |
+| `postcss.config.js` | PostCSS設定（@tailwindcss/postcss） |
+| `src/index.css` | Tailwind v4設定（@theme、CSS変数） |
+| `biome.json` | コード品質設定 |
+| `components.json` | shadcn/ui設定 |
+| `.env.example` | 環境変数テンプレート（→ `.env` にコピー） |
+
+---
+
+## 🔐 API Authentication
+
+### Basic認証設定
+
+| 項目 | 値 | 環境変数 |
+|------|-----|---------|
+| **ユーザー名** | `admin` | `BASIC_AUTH_USERNAME` |
+| **パスワード** | `admin` | `BASIC_AUTH_PASSWORD` |
+
+> ⚠️ **セキュリティ注意**: 上記はデフォルト値（開発用）です。本番環境では `.env` で必ず変更してください。
+
+### 認証範囲
+
+| エンドポイント | 認証 | 説明 |
+|---------------|------|------|
+| `/api/v1/*` | **必要** 🔐 | すべてのAPIルート |
+| `/health` | 不要 ✅ | ヘルスチェック |
+| `/api/doc` | 不要 ✅ | OpenAPI仕様 |
+| `/api/ui` | 不要 ✅ | Swagger UI |
+
+### フロントエンドからのAPI呼び出し
+
+```typescript
+// Authorization ヘッダーを付与
+const credentials = btoa('admin:admin');
+const response = await fetch('/api/v1/users', {
+  headers: {
+    'Authorization': `Basic ${credentials}`,
+  },
+});
+```
+
+---
+
+## 🚦 Endpoints
+
+| URL | 説明 |
+|-----|------|
+| `http://localhost:5173` | フロントエンド開発サーバー |
+| `http://localhost:3000` | バックエンドAPIサーバー |
+| `http://localhost:3000/api/ui` | Swagger UI |
+| `http://localhost:3000/api/doc` | OpenAPI JSON |
