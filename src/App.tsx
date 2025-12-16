@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/Button';
 import type { FC } from 'react';
+import { Button } from '@/components/ui/Button';
 
 /**
  * メインアプリケーションコンポーネント

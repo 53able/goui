@@ -81,6 +81,9 @@ tmp/
 
 # Vite
 .vite/
+
+# TypeScript
+*.tsbuildinfo
 EOF
 
 # 初期コミット
@@ -159,13 +162,37 @@ pnpm dev
 | **ユーザー名** | `admin` |
 | **パスワード** | `admin` |
 | **認証方式** | Basic認証 |
+| **認証範囲** | `/api/v1/*` のみ |
 
 ```bash
 # curlでのAPI呼び出し例
 curl -u admin:admin http://localhost:3000/api/v1/users
 ```
 
-> 💡 本番環境では環境変数 `BASIC_AUTH_USERNAME` / `BASIC_AUTH_PASSWORD` で設定
+> 💡 開発時はフロントエンド（localhost:5173）に認証なし
+
+---
+
+## 本番環境の起動
+
+```bash
+# ビルド
+pnpm build
+
+# 本番サーバー起動（全画面認証）
+pnpm start
+# → http://localhost:3000
+```
+
+### 🔐 本番環境の認証
+
+| 項目 | 値 |
+|------|-----|
+| **認証方式** | Basic認証 |
+| **認証範囲** | 全画面（`/health` 以外） |
+| **SPA配信** | Honoが `dist/` を配信 |
+
+> ⚠️ 本番環境では環境変数 `BASIC_AUTH_USERNAME` / `BASIC_AUTH_PASSWORD` で必ず認証情報を変更
 
 ---
 
@@ -176,7 +203,8 @@ curl -u admin:admin http://localhost:3000/api/v1/users
 | **Setup** | `pnpm install` | 依存関係インストール |
 | **Dev** | `pnpm dev` | フロントエンド開発サーバー（:5173） |
 | **Dev** | `pnpm api:dev` | バックエンド開発サーバー（:3000） |
-| **Build** | `pnpm build` | プロダクションビルド（tsgo + vite） |
+| **Production** | `pnpm build` | プロダクションビルド（tsgo + vite） |
+| **Production** | `pnpm start` | 本番サーバー起動（全画面認証） |
 | **Quality** | `pnpm typecheck` | 型チェック（tsgo - 高速） |
 | **Quality** | `pnpm typecheck:tsc` | 型チェック（tsc - 互換用） |
 | **Quality** | `pnpm lint` | Linting（Biome） |
