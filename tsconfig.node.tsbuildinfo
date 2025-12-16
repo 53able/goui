@@ -1,1 +1,0 @@
-{"root":["./vite.config.ts","./api/index.ts","./api/production.ts","./api/server.ts","./api/routes/health.ts","./api/routes/users/index.ts","./shared/schemas.ts"],"version":"5.8.3"}

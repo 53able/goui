@@ -30,3 +30,6 @@ tmp/
 
 # Vite
 .vite/
+
+# TypeScript
+*.tsbuildinfo
