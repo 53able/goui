@@ -1,28 +1,19 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { apiReference } from '@scalar/hono-api-reference';
-import { basicAuth } from 'hono/basic-auth';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { healthRoutes } from './routes/health';
 import { userRoutes } from './routes/users';
 
 /**
- * Honoアプリケーションインスタンス
+ * Honoアプリケーションインスタンス（API部分のみ）
+ * @description 認証は各サーバー設定で適用
  */
 const app = new OpenAPIHono();
 
 // ミドルウェア設定
 app.use('*', logger());
 app.use('*', cors());
-
-// Basic認証（/api/v1/* のみ）
-app.use(
-  '/api/v1/*',
-  basicAuth({
-    username: process.env.BASIC_AUTH_USERNAME ?? 'admin',
-    password: process.env.BASIC_AUTH_PASSWORD ?? 'admin',
-  }),
-);
 
 // ルート登録
 app.route('/', healthRoutes);
@@ -48,15 +39,7 @@ app.doc('/api/doc', {
 app.get(
   '/api/ui',
   apiReference({
-    spec: {
-      url: '/api/doc',
-    },
-    theme: 'kepler',
-    layout: 'modern',
-    defaultHttpClient: {
-      targetKey: 'javascript',
-      clientKey: 'fetch',
-    },
+    url: '/api/doc',
   }),
 );
 

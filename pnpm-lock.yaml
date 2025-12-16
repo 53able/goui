@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.14.1
+        specifier: ^1.19.7
         version: 1.19.7(hono@4.11.1)
       '@hookform/resolvers':
         specifier: ^3.10.0

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "api:dev": "tsx watch api/server.ts",
     "api:start": "tsx api/server.ts",
+    "start": "tsx api/production.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:tsc": "tsc --noEmit",
     "lint": "biome check --write .",
@@ -18,7 +19,7 @@
     "check": "pnpm typecheck && pnpm lint:check"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.1",
+    "@hono/node-server": "^1.19.7",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-checkbox": "^1.1.6",
