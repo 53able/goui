@@ -3,7 +3,7 @@ import {
   CreateUserSchema,
   PaginationMetaSchema,
   UserSchema,
-} from '../../../shared/schemas';
+} from '../../../shared/schemas.js';
 
 /**
  * ユーザー管理ルーター

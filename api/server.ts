@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { basicAuth } from 'hono/basic-auth';
-import { app } from './index';
+import { app } from './index.js';
 
 /**
  * 開発用APIサーバー

@@ -2,8 +2,8 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { healthRoutes } from './routes/health';
-import { userRoutes } from './routes/users';
+import { healthRoutes } from './routes/health.js';
+import { userRoutes } from './routes/users/index.js';
 
 /**
  * Honoアプリケーションインスタンス（API部分のみ）
@@ -45,3 +45,4 @@ app.get(
 
 export type AppType = typeof app;
 export { app };
+export default app;
