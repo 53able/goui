@@ -167,6 +167,18 @@ app.post('/users', async (c) => {
 });
 ```
 
+### 非推奨（deprecated）APIの使用禁止
+
+```typescript
+// ❌ BAD - @deprecated マークのあるAPI
+import { apiReference } from '@scalar/hono-api-reference';
+
+// ✅ GOOD - 最新の推奨API
+import { Scalar } from '@scalar/hono-api-reference';
+```
+
+> 💡 IDEで `@deprecated` 警告が出たら、パッケージのドキュメントや型定義を確認して最新APIに移行すること。
+
 ---
 
 ## ✅ REQUIRED - 必須パターン

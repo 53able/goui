@@ -1,0 +1,307 @@
+---
+alwaysApply: false
+description: CSSレイアウトの課題（中央配置、レスポンシブグリッド、ページ構造など）に対して最適なパターン（Flexbox/Grid）を即座に選択・適用するためのリファレンスガイド
+---
+# モダンCSSレイアウトパターン リファレンス
+
+> **目的**: UIレイアウトの課題に対して、最適なCSSパターンを即座に選択・適用する
+
+---
+
+## クイックリファレンス
+
+| 課題 | 推奨パターン | 核心コード |
+|------|-------------|---de--------|
+| 要素を完全に中央配置したい | Super Centered | `display: grid; place-items: center;` |
+| 単一要素を素早く中央配置 | Autobot | `display: flex;` + 子に `margin: auto;` |
+| 複数要素を縦に中央揃え | Gentle Flex | `display: flex; flex-direction: column; align-items: center; justify-content: center;` |
+| グループ全体を中央配置 | Content Center | `display: grid; place-content: center;` |
+| モーダル/オーバーレイの中央配置 | Pop n' Plop | `position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);` |
+| メディアクエリなしでレスポンシブグリッド | RAM | `grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));` |
+| 自動折り返しのカード列 | Deconstructed Pancake | `display: flex; flex-wrap: wrap;` + 子に `flex: 1 1 150px;` |
+| 最小・最大幅を制限したい | Clamping | `width: clamp(23ch, 60%, 46ch);` |
+| コンテナサイズに応じたスタイル変更 | Container Query | `container: inline-size;` + `@container` |
+| スティッキーフッター | Pancake Stack | `grid-template-rows: auto 1fr auto;` |
+| ヘッダー+サイドバー+メイン+フッター | Holy Grail | `grid-template: auto 1fr auto / auto 1fr auto;` |
+| アスペクト比を維持した画像/動画 | Aspect Ratio | `aspect-ratio: 16 / 9;` |
+
+---
+
+## 意思決定フロー
+
+```
+何を実現したい？
+│
+├─ 要素を中央に配置したい
+│   ├─ 単一要素？ → Super Centered または Autobot
+│   ├─ 複数要素を縦に？ → Gentle Flex
+│   ├─ グループ全体を？ → Content Center
+│   └─ オーバーレイ/モーダル？ → Pop n' Plop
+│
+├─ レスポンシブなグリッド/カード配置
+│   ├─ メディアクエリなしで？ → RAM
+│   ├─ 折り返して縦に積む？ → Deconstructed Pancake
+│   └─ コンテナサイズベース？ → Container Query
+│
+├─ ページ全体の骨格を作りたい
+│   ├─ Header + Main + Footer？ → Pancake Stack
+│   └─ サイドバーも含む？ → Holy Grail
+│
+└─ サイズを制御したい
+    ├─ 幅の最小・最大を設定？ → Clamping (clamp())
+    └─ 縦横比を固定？ → Aspect Ratio
+```
+
+---
+
+## パターン詳細
+
+### 中央配置パターン
+
+#### Super Centered
+**When**: 任意の要素を親の中央に完璧に配置したいとき（最もシンプル）
+
+```css
+.parent {
+  display: grid;
+  place-items: center;
+}
+```
+
+**Gotchas**: 親に高さが必要（`height: 100vh` など）
+
+---
+
+#### Autobot
+**When**: Flexコンテナ内の単一要素を素早く中央配置
+
+```css
+.parent { display: flex; }
+.child { margin: auto; }
+```
+
+**Gotchas**: 複数要素には不向き
+
+---
+
+#### Gentle Flex
+**When**: 複数要素を縦方向に並べつつ中央揃え（サイズ変更なし）
+
+```css
+.parent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1ch;
+}
+```
+
+**Gotchas**: 子要素のサイズは変わらない（Content Centerとの違い）
+
+---
+
+#### Content Center
+**When**: グループ全体をまとめて中央配置
+
+```css
+.parent {
+  display: grid;
+  place-content: center;
+  gap: 1ch;
+}
+```
+
+**Gotchas**: 全ての子要素が最も幅の広い要素の幅に揃う
+
+---
+
+#### Pop n' Plop
+**When**: モーダル、ツールチップ、オーバーレイの中央配置
+
+```css
+.parent { position: relative; }
+.overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+```
+
+**Gotchas**: 親に `position: relative` が必須
+
+---
+
+### レスポンシブパターン
+
+#### RAM (Repeat, Auto, Minmax)
+**When**: メディアクエリなしでレスポンシブなグリッドレイアウト
+
+```css
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+```
+
+**Gotchas**:
+- `auto-fit`: 空トラックを折りたたみ、アイテムが伸長
+- `auto-fill`: 空トラックを維持
+
+---
+
+#### Deconstructed Pancake
+**When**: 横並びから縦積みへ自動折り返し
+
+```css
+.parent {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.item {
+  flex: 1 1 150px; /* grow shrink basis */
+}
+```
+
+**Gotchas**: `flex-basis` が折り返しのトリガーポイント
+
+---
+
+#### Clamping
+**When**: 幅やフォントサイズに最小・推奨・最大値を設定
+
+```css
+.card { width: clamp(23ch, 60%, 46ch); }
+.title { font-size: clamp(1.5rem, 5vw, 3rem); }
+```
+
+**Gotchas**: `clamp(min, preferred, max)` の順序を間違えない
+
+---
+
+#### Container Query
+**When**: ビューポートではなくコンテナサイズに応じてスタイル変更
+
+```css
+.container { container: inline-size; }
+
+@container (min-width: 350px) {
+  .card {
+    display: grid;
+    grid-template-columns: 40% 1fr;
+  }
+}
+```
+
+**Gotchas**:
+- 親に `container: inline-size` が必須
+- `container-name` でネストされたコンテナを識別可能
+
+---
+
+### ページ構造パターン
+
+#### Pancake Stack（スティッキーフッター）
+**When**: Header/Main/Footer構造でフッターを常に最下部に
+
+```css
+.layout {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+}
+```
+
+**Gotchas**: `1fr` がメイン領域を伸長させ、フッターを押し下げる
+
+---
+
+#### Holy Grail
+**When**: ヘッダー + 左右サイドバー + メイン + フッターの5領域構造
+
+```css
+.layout {
+  display: grid;
+  grid-template: auto 1fr auto / auto 1fr auto;
+}
+header, footer { grid-column: 1 / 4; }
+.left { grid-column: 1 / 2; }
+main { grid-column: 2 / 3; }
+.right { grid-column: 3 / 4; }
+```
+
+**Gotchas**: `grid-template` は `rows / columns` の順（スラッシュ区切り）
+
+---
+
+### コンポーネントパターン
+
+#### Aspect Ratio
+**When**: 画像や動画の縦横比を維持
+
+```css
+.video-container { aspect-ratio: 16 / 9; }
+.square { aspect-ratio: 1 / 1; }
+.portrait { aspect-ratio: 3 / 4; }
+```
+
+**Gotchas**: 旧来の `padding-top` ハックは不要
+
+---
+
+## アンチパターン
+
+| やりがち | 問題点 | 代わりに |
+|---------|--------|---------|
+| `margin: 0 auto` で垂直中央 | 水平方向のみ有効 | `place-items: center` を使う |
+| `position: absolute` + 固定値 | レスポンシブでない | `transform: translate(-50%, -50%)` |
+| メディアクエリの乱用 | 保守性低下 | `clamp()`, `minmax()`, Container Query |
+| `padding-top: 56.25%` でアスペクト比 | ハック的で読みにくい | `aspect-ratio: 16/9` |
+| `float` でレイアウト | 旧式、予期せぬ挙動 | Flexbox または Grid |
+| 固定幅 (`width: 300px`) | レスポンシブでない | `clamp()` または `minmax()` |
+
+---
+
+## 使用例：よくある実装パターン
+
+### ローディングスピナーの中央配置
+```css
+.loading-container {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+}
+```
+
+### レスポンシブなカードグリッド
+```css
+.card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+```
+
+### フルハイトアプリレイアウト
+```css
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100dvh; /* dvh = dynamic viewport height */
+}
+```
+
+### サイドバー付きダッシュボード
+```css
+.dashboard {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  min-height: 100dvh;
+}
+@media (max-width: 768px) {
+  .dashboard { grid-template-columns: 1fr; }
+}
+```

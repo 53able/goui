@@ -107,7 +107,7 @@ cp .env.example .env
 
 ### 🔐 API認証情報の設定
 
-`.env` ファイルを編集して、Basic認証の認証情報を設定してください：
+`.env` ファイルを編集して、Basic認証の認証情報を設定：
 
 ```bash
 # .env
@@ -115,7 +115,7 @@ BASIC_AUTH_USERNAME=your_username  # ← 任意のユーザー名に変更
 BASIC_AUTH_PASSWORD=your_password  # ← 安全なパスワードに変更
 ```
 
-> ⚠️ **セキュリティ注意**: デフォルトの `admin/admin` は開発用です。本番環境では必ず変更してください。
+> 📖 認証の詳細（デフォルト値・認証範囲）は **project.mdc「🔐 API Authentication」** を参照
 
 ```bash
 # コミット
@@ -135,7 +135,6 @@ pnpm typecheck && pnpm lint && pnpm test
 
 # 開発サーバー起動
 pnpm dev
-# → http://localhost:5173
 ```
 
 > 💡 `pnpm typecheck` は tsgo（TypeScript Go native）を使用。従来のtscは `pnpm typecheck:tsc` で実行可能。
@@ -147,29 +146,19 @@ pnpm dev
 ```bash
 # ターミナル1: バックエンド（Hono）
 pnpm api:dev
-# → http://localhost:3000
-# → Swagger UI: http://localhost:3000/api/ui
 
 # ターミナル2: フロントエンド（Vite）
 pnpm dev
-# → http://localhost:5173
 ```
 
-### 🔐 API認証情報（開発環境）
+> 📖 ポート・URL情報は **project.mdc「🚦 Endpoints」** を参照
 
-| 項目 | 値 |
-|------|-----|
-| **ユーザー名** | `admin` |
-| **パスワード** | `admin` |
-| **認証方式** | Basic認証 |
-| **認証範囲** | `/api/v1/*` のみ |
+### curlでのAPI呼び出し例
 
 ```bash
-# curlでのAPI呼び出し例
+# 認証情報はデフォルト値（開発用）
 curl -u admin:admin http://localhost:3000/api/v1/users
 ```
-
-> 💡 開発時はフロントエンド（localhost:5173）に認証なし
 
 ---
 
@@ -181,18 +170,9 @@ pnpm build
 
 # 本番サーバー起動（全画面認証）
 pnpm start
-# → http://localhost:3000
 ```
 
-### 🔐 本番環境の認証
-
-| 項目 | 値 |
-|------|-----|
-| **認証方式** | Basic認証 |
-| **認証範囲** | 全画面（`/health` 以外） |
-| **SPA配信** | Honoが `dist/` を配信 |
-
-> ⚠️ 本番環境では環境変数 `BASIC_AUTH_USERNAME` / `BASIC_AUTH_PASSWORD` で必ず認証情報を変更
+> 📖 本番環境の認証範囲は **project.mdc「🔐 API Authentication」** を参照
 
 ---
 
@@ -201,12 +181,14 @@ pnpm start
 | カテゴリ | コマンド | 用途 |
 |---------|---------|------|
 | **Setup** | `pnpm install` | 依存関係インストール |
-| **Dev** | `pnpm dev` | フロントエンド開発サーバー（:5173） |
-| **Dev** | `pnpm api:dev` | バックエンド開発サーバー（:3000） |
-| **Production** | `pnpm build` | プロダクションビルド（tsgo + vite） |
-| **Production** | `pnpm start` | 本番サーバー起動（全画面認証） |
+| **Dev** | `pnpm dev` | フロントエンド開発サーバー |
+| **Dev** | `pnpm api:dev` | バックエンド開発サーバー |
+| **Production** | `pnpm build` | プロダクションビルド |
+| **Production** | `pnpm start` | 本番サーバー起動 |
 | **Quality** | `pnpm typecheck` | 型チェック（tsgo - 高速） |
 | **Quality** | `pnpm typecheck:tsc` | 型チェック（tsc - 互換用） |
 | **Quality** | `pnpm lint` | Linting（Biome） |
 | **Quality** | `pnpm test` | テスト実行（Vitest） |
 | **Quality** | `pnpm check` | 型チェック + Lint |
+
+> 📖 コミット前の必須チェックは **project.mdc「✅ Quality Gates」** を参照

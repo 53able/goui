@@ -2,6 +2,20 @@
 
 @plugin "tailwindcss-animate";
 
+/* テトリス ゲーム設定 */
+:root {
+  /* セルサイズ: 幅(10列)と高さ(20行)の内接フィット */
+  --tetris-cell-size: min(9.8vw, 4dvh);
+  /* ボードパディング */
+  --tetris-board-padding: 2px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --tetris-board-padding: 4px;
+  }
+}
+
 /* shadcn/ui CSS変数定義 */
 @layer base {
   :root {
@@ -88,5 +102,51 @@
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
+  }
+}
+
+/* テトリス消去アニメーション */
+@keyframes line-clear-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    opacity: 0.8;
+    transform: scale(1.2) rotate(90deg);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.4) rotate(180deg);
+  }
+  75% {
+    opacity: 0.4;
+    transform: scale(1.2) rotate(270deg);
+  }
+}
+
+@keyframes particle-explode {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx, 0), var(--ty, 0)) scale(0);
+  }
+}
+
+@keyframes score-pop {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
 }

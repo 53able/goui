@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { apiReference } from '@scalar/hono-api-reference';
+import { Scalar } from '@scalar/hono-api-reference';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { healthRoutes } from './routes/health';
@@ -38,7 +38,7 @@ app.doc('/api/doc', {
 // Swagger UI (Scalar)
 app.get(
   '/api/ui',
-  apiReference({
+  Scalar({
     url: '/api/doc',
   }),
 );
