@@ -193,8 +193,11 @@ const getTetrominoColor = (type: string): number => {
  * モバイルファースト・レスポンシブレイアウト
  */
 export const Tetris: FC = () => {
-  const { game, startGame, togglePause, resetGame, moveLeft, moveRight, moveDown, rotate, hardDrop, update, completeLineClear } =
+  const { game, highScores, newHighScoreRank, startGame, togglePause, resetGame, moveLeft, moveRight, moveDown, rotate, hardDrop, update, completeLineClear } =
     useTetrisStore();
+  
+  // ハイスコア（1位）を取得
+  const topScore = highScores[0]?.score ?? 0;
   const animationFrameRef = useRef<number>();
   const clearAnimationTimeoutRef = useRef<number>();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -419,6 +422,15 @@ export const Tetris: FC = () => {
               <div className="text-[10px] sm:text-xs text-muted-foreground leading-tight">Lines</div>
               <div className="text-sm sm:text-xl font-bold">{game.lines}</div>
             </div>
+            {/* ハイスコア表示 */}
+            {topScore > 0 && (
+              <div className="text-center border-l border-gray-300 dark:border-gray-600 pl-2 sm:pl-4">
+                <div className="text-[10px] sm:text-xs text-muted-foreground leading-tight">🏆 Best</div>
+                <div className="text-sm sm:text-xl font-bold text-yellow-600 dark:text-yellow-400">
+                  {topScore.toLocaleString()}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* NEXTピース - コンパクト版 */}
@@ -491,9 +503,31 @@ export const Tetris: FC = () => {
           {/* ゲームオーバーメッセージ - ボード上にオーバーレイ */}
           {game.state === 'gameOver' && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30">
-              <div className="text-center p-3 sm:p-4 bg-background border border-destructive rounded shadow-2xl">
-                <p className="text-base sm:text-xl font-bold text-destructive">ゲームオーバー</p>
-                <p className="text-xs sm:text-sm mt-1">スコア: {game.score.toLocaleString()}</p>
+              <div
+                className={`text-center p-3 sm:p-4 bg-background rounded shadow-2xl ${
+                  newHighScoreRank
+                    ? 'border-2 border-yellow-400 animate-pulse'
+                    : 'border border-destructive'
+                }`}
+              >
+                {newHighScoreRank ? (
+                  <>
+                    <p className="text-base sm:text-xl font-bold text-yellow-500 animate-bounce">
+                      🏆 新記録！ {newHighScoreRank}位 🏆
+                    </p>
+                    <p className="text-lg sm:text-2xl font-bold mt-1 text-yellow-600">
+                      {game.score.toLocaleString()}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                      Lv.{game.level} / {game.lines} Lines
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-base sm:text-xl font-bold text-destructive">ゲームオーバー</p>
+                    <p className="text-xs sm:text-sm mt-1">スコア: {game.score.toLocaleString()}</p>
+                  </>
+                )}
               </div>
             </div>
           )}

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 import type { GameState, TetrisGame, Tetromino } from '../../shared/schemas';
 import {
   BOARD_HEIGHT,
@@ -15,11 +15,25 @@ import {
 } from '../lib/tetrisLogic';
 
 /**
+ * ハイスコアエントリ
+ */
+interface HighScoreEntry {
+  score: number;
+  level: number;
+  lines: number;
+  date: string;
+}
+
+/**
  * テトリスストアの状態インターフェース
  */
 interface TetrisStore {
   /** ゲーム状態 */
   game: TetrisGame;
+  /** ハイスコアリスト（トップ5） */
+  highScores: HighScoreEntry[];
+  /** 新記録達成フラグ（ランク番号、nullなら未達成） */
+  newHighScoreRank: number | null;
   /** ゲームを開始 */
   startGame: () => void;
   /** ゲームを一時停止/再開 */
@@ -43,6 +57,41 @@ interface TetrisStore {
 }
 
 /**
+ * ハイスコアを更新してランクを返す
+ */
+const updateHighScores = (
+  highScores: HighScoreEntry[],
+  newScore: number,
+  level: number,
+  lines: number,
+): { newHighScores: HighScoreEntry[]; rank: number | null } => {
+  if (newScore === 0) {
+    return { newHighScores: highScores, rank: null };
+  }
+
+  const newEntry: HighScoreEntry = {
+    score: newScore,
+    level,
+    lines,
+    date: new Date().toISOString(),
+  };
+
+  // スコアでソートして挿入位置を決定
+  const allScores = [...highScores, newEntry].sort((a, b) => b.score - a.score);
+  const rank = allScores.findIndex((entry) => entry === newEntry);
+
+  // トップ5のみ保持
+  const newHighScores = allScores.slice(0, 5);
+
+  // ランク5位以内ならランクを返す（0-indexed）
+  if (rank < 5) {
+    return { newHighScores, rank: rank + 1 }; // 1-indexed に変換
+  }
+
+  return { newHighScores: highScores, rank: null };
+};
+
+/**
  * 空のボードを生成
  */
 const createEmptyBoard = (): number[][] => {
@@ -53,35 +102,39 @@ const createEmptyBoard = (): number[][] => {
 
 /**
  * テトリスゲーム管理用Zustandストア
+ * ハイスコアはローカルストレージに永続化
  */
 export const useTetrisStore = create<TetrisStore>()(
-  devtools(
-    (set, get) => {
-      const initializeGame = (): TetrisGame => {
-        const currentPiece = createRandomTetromino();
-        const nextPiece = createRandomTetromino();
-        const now = performance.now();
+  persist(
+    devtools(
+      (set, get) => {
+        const initializeGame = (): TetrisGame => {
+          const currentPiece = createRandomTetromino();
+          const nextPiece = createRandomTetromino();
+          const now = performance.now();
+
+          return {
+            board: createEmptyBoard(),
+            currentPiece,
+            nextPiece,
+            score: 0,
+            level: 1,
+            lines: 0,
+            state: 'playing',
+            dropTime: calculateDropSpeed(1),
+            lastTime: now,
+            clearingLines: [],
+            scoreAnimation: null,
+          };
+        };
 
         return {
-          board: createEmptyBoard(),
-          currentPiece,
-          nextPiece,
-          score: 0,
-          level: 1,
-          lines: 0,
-          state: 'playing',
-          dropTime: calculateDropSpeed(1),
-          lastTime: now,
-          clearingLines: [],
-          scoreAnimation: null,
-        };
-      };
-
-      return {
-        game: initializeGame(),
+          game: initializeGame(),
+          highScores: [],
+          newHighScoreRank: null,
 
         startGame: () => {
-          set({ game: initializeGame() });
+          set({ game: initializeGame(), newHighScoreRank: null });
         },
 
         togglePause: () => {
@@ -192,12 +245,21 @@ export const useTetrisStore = create<TetrisStore>()(
 
             // ゲームオーバーチェック
             if (checkCollision(newBoard, newCurrentPiece)) {
+              const { highScores } = get();
+              const { newHighScores, rank } = updateHighScores(
+                highScores,
+                game.score,
+                game.level,
+                game.lines,
+              );
               set({
                 game: {
                   ...game,
                   board: newBoard,
                   state: 'gameOver',
                 },
+                highScores: newHighScores,
+                newHighScoreRank: rank,
               });
               return;
             }
@@ -287,12 +349,21 @@ export const useTetrisStore = create<TetrisStore>()(
 
           // ゲームオーバーチェック
           if (checkCollision(newBoard, newCurrentPiece)) {
+            const { highScores } = get();
+            const { newHighScores, rank } = updateHighScores(
+              highScores,
+              game.score,
+              game.level,
+              game.lines,
+            );
             set({
               game: {
                 ...game,
                 board: newBoard,
                 state: 'gameOver',
               },
+              highScores: newHighScores,
+              newHighScoreRank: rank,
             });
             return;
           }
@@ -351,14 +422,26 @@ export const useTetrisStore = create<TetrisStore>()(
 
           // ゲームオーバーチェック
           if (checkCollision(clearedBoard, newCurrentPiece)) {
+            const { highScores } = get();
+            const { newHighScores, rank } = updateHighScores(
+              highScores,
+              newScore,
+              newLevel,
+              newLines,
+            );
             set({
               game: {
                 ...game,
                 board: clearedBoard,
+                score: newScore,
+                level: newLevel,
+                lines: newLines,
                 state: 'gameOver',
                 clearingLines: [],
                 scoreAnimation: null,
               },
+              highScores: newHighScores,
+              newHighScoreRank: rank,
             });
             return;
           }
@@ -383,5 +466,10 @@ export const useTetrisStore = create<TetrisStore>()(
     },
     { name: 'tetris-store' },
   ),
+  {
+    name: 'tetris-highscores',
+    // ハイスコアのみ永続化（ゲーム状態は保存しない）
+    partialize: (state) => ({ highScores: state.highScores }),
+  },
 );
 
