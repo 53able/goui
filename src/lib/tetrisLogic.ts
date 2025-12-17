@@ -246,6 +246,7 @@ export const BOARD_HEIGHT = 20;
 
 /**
  * ランダムなテトリミノを生成
+ * 画面外（上部）から落ちてくるように初期位置を設定
  * @returns 新しいテトリミノ
  */
 export const createRandomTetromino = (): Tetromino => {
@@ -255,7 +256,7 @@ export const createRandomTetromino = (): Tetromino => {
 
   return {
     type,
-    position: { x: Math.floor(BOARD_WIDTH / 2) - 2, y: 0 },
+    position: { x: Math.floor(BOARD_WIDTH / 2) - 2, y: -2 }, // 画面外から開始
     rotation: 0,
     shape,
   };
