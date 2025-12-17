@@ -466,10 +466,11 @@ export const useTetrisStore = create<TetrisStore>()(
     },
     { name: 'tetris-store' },
   ),
-  {
-    name: 'tetris-highscores',
-    // ハイスコアのみ永続化（ゲーム状態は保存しない）
-    partialize: (state) => ({ highScores: state.highScores }),
-  },
+    {
+      name: 'tetris-highscores',
+      // ハイスコアのみ永続化（ゲーム状態は保存しない）
+      partialize: (state) => ({ highScores: state.highScores }),
+    },
+  ),
 );
 
