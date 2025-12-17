@@ -34,7 +34,7 @@ const healthRoute = createRoute({
   },
 });
 
-healthRoutes.openapi(healthRoute, (c) => {
+healthRoutes.openapi(healthRoute, async (c) => {
   return c.json(
     {
       status: 'ok' as const,

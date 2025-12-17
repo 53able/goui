@@ -141,7 +141,7 @@ const getUserRoute = createRoute({
 
 // ============ ハンドラー実装 ============
 
-userRoutes.openapi(listUsersRoute, (c) => {
+userRoutes.openapi(listUsersRoute, async (c) => {
   const { page = 1, limit = 20 } = c.req.valid('query');
   const start = (page - 1) * limit;
   const end = start + limit;
@@ -161,7 +161,7 @@ userRoutes.openapi(listUsersRoute, (c) => {
   );
 });
 
-userRoutes.openapi(createUserRoute, (c) => {
+userRoutes.openapi(createUserRoute, async (c) => {
   const body = c.req.valid('json');
   const now = new Date();
   const newUser = {
@@ -175,7 +175,7 @@ userRoutes.openapi(createUserRoute, (c) => {
   return c.json(newUser, 201);
 });
 
-userRoutes.openapi(getUserRoute, (c) => {
+userRoutes.openapi(getUserRoute, async (c) => {
   const { id } = c.req.valid('param');
   const user = users.find((u) => u.id === id);
 
