@@ -7,7 +7,7 @@ import app from '../server/app.js';
  * @note 認証は middleware.ts で全体適用済み
  */
 export const config = {
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs18.x',
   maxDuration: 30,
 };
 

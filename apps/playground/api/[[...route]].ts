@@ -8,7 +8,7 @@ import app from '../server/app.js';
  * @note Edge Runtime では @goui/shared 等がサポートされないため nodejs を使用
  */
 export const config = {
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs18.x',
   maxDuration: 30,
 };
 
