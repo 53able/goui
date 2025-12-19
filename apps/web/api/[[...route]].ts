@@ -6,12 +6,11 @@ import { handle } from 'hono/vercel';
  * @description テスト用シンプルHonoアプリ
  */
 export const config = {
-  runtime: 'nodejs',
-  maxDuration: 30,
+  runtime: 'edge',
 };
 
-// テスト用シンプルアプリ
-const app = new Hono();
+// テスト用シンプルアプリ（basePath を使用）
+const app = new Hono().basePath('/api');
 
 app.get('/health', (c) => {
   return c.json({
@@ -21,7 +20,7 @@ app.get('/health', (c) => {
   });
 });
 
-app.get('/api/test', (c) => {
+app.get('/test', (c) => {
   return c.json({ message: 'Hello from Hono on Vercel!' });
 });
 
