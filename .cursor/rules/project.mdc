@@ -312,9 +312,10 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 |-----|--------|------|
 | `http://localhost:5173` | @myorg/web | メインWebアプリ |
 | `http://localhost:5174` | @myorg/admin | 管理画面 |
-| `http://localhost:3000` | API | バックエンドAPIサーバー |
-| `http://localhost:3000/api/ui` | API | Swagger UI |
-| `http://localhost:3000/api/doc` | API | OpenAPI JSON |
+| `http://localhost:5175` | @myorg/playground | 実験場（ライフゲームなど） |
+| `http://localhost:3000` | API (web) | バックエンドAPIサーバー |
+| `http://localhost:3000/api/ui` | API (web) | Swagger UI |
+| `http://localhost:3000/api/doc` | API (web) | OpenAPI JSON |
 
 ### Vercel環境（マルチプロジェクト）
 
@@ -322,6 +323,12 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 |-------------|----------------|-----|
 | myorg-web | `apps/web` | `https://myorg-web.vercel.app` |
 | myorg-admin | `apps/admin` | `https://myorg-admin.vercel.app` |
+| myorg-playground | `apps/playground` | `https://myorg-playground.vercel.app` |
+
+> ⚠️ **Edge Runtime 制約**: Vercel Edge Runtime では `@myorg/shared`、`@hono/zod-openapi`、`@scalar/hono-api-reference` などのモジュールがサポートされません。そのため：
+> - `api/[[...route]].ts`: シンプルなインラインHonoアプリを使用
+> - `middleware.ts`: 純粋なJavaScriptで Basic認証を実装
+> - ローカル開発では `server/app.ts` の完全版APIを使用
 
 ---
 
@@ -357,11 +364,12 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 
 ### ポート番号の割り当て
 
-| アプリ | ポート |
-|--------|--------|
-| @myorg/web | 5173 |
-| @myorg/admin | 5174 |
-| 新アプリ | 5175〜 |
+| アプリ | Viteポート | APIポート |
+|--------|------------|-----------|
+| @myorg/web | 5173 | 3000 |
+| @myorg/admin | 5174 | 3001 |
+| @myorg/playground | 5175 | 3002 |
+| 新アプリ | 5176〜 | 3003〜 |
 
 ### クイックスタート
 

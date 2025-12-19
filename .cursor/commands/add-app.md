@@ -795,18 +795,31 @@ healthRoutes.openapi(healthRoute, async (c) => {
 
 #### Step 2.14: api/[[...route]].ts 生成
 
+> ⚠️ **重要**: Vercel Edge Runtime では `@myorg/shared` や `@scalar/hono-api-reference` がサポートされないため、インラインでシンプルなHonoアプリを定義します。ローカル開発では `server/app.ts` の完全版APIを使用します。
+
 ```typescript
+import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
-import app from '../server/app.js';
 
 /**
  * Vercel Edge Functions用ハンドラー
- * @description 全てのリクエストをHonoアプリにルーティング
- * @note 認証は middleware.ts で適用
+ * @description シンプルなHonoアプリ（Edge Runtime）
+ * @note ローカル開発では server/app.ts を使用
  */
 export const config = {
   runtime: 'edge',
 };
+
+// シンプルなHonoアプリ（Vercel用）
+const app = new Hono().basePath('/api');
+
+app.get('/health', (c) => {
+  return c.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '0.1.0',
+  });
+});
 
 export default handle(app);
 ```
@@ -815,45 +828,57 @@ export default handle(app);
 
 ##### 認証スコープ: `api-only`
 
+> ⚠️ **重要**: Vercel Edge Runtime では Hono モジュールがサポートされないため、純粋なJavaScriptで実装します。
+
 ```typescript
 import { next } from '@vercel/edge';
-import { Hono } from 'hono';
-import { basicAuth } from 'hono/basic-auth';
 
 /**
- * Vercel Edge Middleware - API認証のみ（Hono版）
+ * Vercel Edge Middleware - API認証のみ（純粋JS版）
  * @description /api/v1/* のみBasic認証を適用
+ * @note Honoモジュールは Edge Runtime でサポートされないため純粋JSで実装
  */
 export const config = {
   matcher: ['/api/v1/:path*'],
 };
 
 /**
- * 認証用Honoアプリ
+ * Basic認証の検証
  */
-const authApp = new Hono();
+const verifyCredentials = (authHeader: string | null): boolean => {
+  if (!authHeader?.startsWith('Basic ')) {
+    return false;
+  }
+  const base64Credentials = authHeader.slice(6);
+  const credentials = atob(base64Credentials);
+  const [username, password] = credentials.split(':');
 
-authApp.use(
-  '*',
-  basicAuth({
-    username: process.env.BASIC_AUTH_USERNAME ?? 'admin',
-    password: process.env.BASIC_AUTH_PASSWORD ?? 'admin',
-  }),
-);
+  const validUsername = process.env.BASIC_AUTH_USERNAME ?? 'admin';
+  const validPassword = process.env.BASIC_AUTH_PASSWORD ?? 'admin';
 
-// 認証成功時は 200 を返す
-authApp.all('*', (c) => c.text('ok'));
+  return username === validUsername && password === validPassword;
+};
+
+/**
+ * 401 Unauthorized レスポンス
+ */
+const unauthorizedResponse = (): Response => {
+  return new Response('Unauthorized', {
+    status: 401,
+    headers: {
+      'WWW-Authenticate': 'Basic realm="Secure Area"',
+    },
+  });
+};
 
 /**
  * Vercel Edge Middleware エントリーポイント
  */
 export default async function middleware(request: Request) {
-  // Hono で Basic 認証チェック
-  const authResponse = await authApp.fetch(request);
-
-  // 認証失敗（401）ならそのまま返す
-  if (authResponse.status === 401) {
-    return authResponse;
+  // Basic認証チェック
+  const authHeader = request.headers.get('Authorization');
+  if (!verifyCredentials(authHeader)) {
+    return unauthorizedResponse();
   }
 
   // 認証成功なら元のリクエストを続行
@@ -863,35 +888,48 @@ export default async function middleware(request: Request) {
 
 ##### 認証スコープ: `full-app`
 
+> ⚠️ **重要**: Vercel Edge Runtime では Hono モジュールがサポートされないため、純粋なJavaScriptで実装します。
+
 ```typescript
 import { next } from '@vercel/edge';
-import { Hono } from 'hono';
-import { basicAuth } from 'hono/basic-auth';
 
 /**
- * Vercel Edge Middleware - Basic認証（Hono版）
+ * Vercel Edge Middleware - Basic認証（純粋JS版）
  * @description 全画面にBasic認証を適用（静的ファイル含む）
- * @note Honoの basicAuth ミドルウェアを使用し、認証後は next() で続行
+ * @note Honoモジュールは Edge Runtime でサポートされないため純粋JSで実装
  */
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
 
 /**
- * 認証用Honoアプリ
+ * Basic認証の検証
  */
-const authApp = new Hono();
+const verifyCredentials = (authHeader: string | null): boolean => {
+  if (!authHeader?.startsWith('Basic ')) {
+    return false;
+  }
+  const base64Credentials = authHeader.slice(6);
+  const credentials = atob(base64Credentials);
+  const [username, password] = credentials.split(':');
 
-authApp.use(
-  '*',
-  basicAuth({
-    username: process.env.BASIC_AUTH_USERNAME ?? 'admin',
-    password: process.env.BASIC_AUTH_PASSWORD ?? 'admin',
-  }),
-);
+  const validUsername = process.env.BASIC_AUTH_USERNAME ?? 'admin';
+  const validPassword = process.env.BASIC_AUTH_PASSWORD ?? 'admin';
 
-// 認証成功時は 200 を返す（この後 next() に切り替える）
-authApp.all('*', (c) => c.text('ok'));
+  return username === validUsername && password === validPassword;
+};
+
+/**
+ * 401 Unauthorized レスポンス
+ */
+const unauthorizedResponse = (): Response => {
+  return new Response('Unauthorized', {
+    status: 401,
+    headers: {
+      'WWW-Authenticate': 'Basic realm="Secure Area"',
+    },
+  });
+};
 
 /**
  * Vercel Edge Middleware エントリーポイント
@@ -899,17 +937,15 @@ authApp.all('*', (c) => c.text('ok'));
 export default async function middleware(request: Request) {
   const url = new URL(request.url);
 
-  // ヘルスチェックは認証スキップ
+  // ヘルスチェックは認証スキップ (for web/admin)
   if (url.pathname === '/health') {
     return next();
   }
 
-  // Hono で Basic 認証チェック
-  const authResponse = await authApp.fetch(request);
-
-  // 認証失敗（401）ならそのまま返す
-  if (authResponse.status === 401) {
-    return authResponse;
+  // Basic認証チェック
+  const authHeader = request.headers.get('Authorization');
+  if (!verifyCredentials(authHeader)) {
+    return unauthorizedResponse();
   }
 
   // 認証成功なら元のリクエストを続行

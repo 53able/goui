@@ -118,9 +118,10 @@ pnpm dev
 |-----|--------|------|
 | `http://localhost:5173` | @myorg/web | メインWebアプリ |
 | `http://localhost:5174` | @myorg/admin | 管理画面 |
-| `http://localhost:3000` | API | バックエンドAPIサーバー |
-| `http://localhost:3000/api/ui` | API | Swagger UI |
-| `http://localhost:3000/api/doc` | API | OpenAPI JSON |
+| `http://localhost:5175` | @myorg/playground | 実験場（ライフゲームなど） |
+| `http://localhost:3000` | API (web) | バックエンドAPIサーバー |
+| `http://localhost:3000/api/ui` | API (web) | Swagger UI |
+| `http://localhost:3000/api/doc` | API (web) | OpenAPI JSON |
 
 ### curlでのAPI呼び出し例
 
@@ -224,6 +225,7 @@ vercel deploy
   "framework": "vite",
   "regions": ["hnd1"],
   "rewrites": [
+    { "source": "/health", "destination": "/api/[[...route]]" },
     { "source": "/api/:path*", "destination": "/api/[[...route]]" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ]
@@ -234,6 +236,22 @@ vercel deploy
 |-----|------|
 | `regions` | `hnd1` = 東京リージョン |
 | `rewrites` | SPA対応 + Edge Functions へのルーティング |
+
+### ⚠️ Vercel Edge Runtime の制約
+
+Vercel Edge Runtime では以下のモジュールがサポートされません：
+- `@myorg/shared` などのワークスペースパッケージ
+- `@hono/zod-openapi`
+- `@scalar/hono-api-reference`
+
+そのため、Vercel用のファイルは以下のように実装します：
+
+| ファイル | 実装方法 |
+|---------|---------|
+| `api/[[...route]].ts` | シンプルなインラインHonoアプリ（Edge Runtime） |
+| `middleware.ts` | 純粋なJavaScriptで Basic認証を実装 |
+
+> 📝 ローカル開発では `server/app.ts` の完全版API（OpenAPI/Swagger UI付き）を使用します。
 
 ### Ignored Build Step（差分ビルド）
 
@@ -492,5 +510,7 @@ pnpm --filter @myorg/新アプリ dev
 |-------------|------|------|
 | `@myorg/web` | `apps/web` | メインWebアプリ（+ API） |
 | `@myorg/admin` | `apps/admin` | 管理画面 |
+| `@myorg/playground` | `apps/playground` | 実験場（ライフゲームなど） |
 | `@myorg/shared` | `packages/shared` | 共有スキーマ・型定義 |
 | `@myorg/ui` | `packages/ui` | 共有UIコンポーネント |
+| `@myorg/ai` | `packages/ai` | AI SDK 共有パッケージ |
