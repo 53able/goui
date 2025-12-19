@@ -5,6 +5,11 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "regions": ["hnd1"],
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
       "source": "/health",
