@@ -4,4 +4,4 @@
  * @see https://hono.dev/docs/getting-started/vercel
  * @note 認証は middleware.ts（Edge Middleware）で適用
  */
-export { default } from '../server/app';
+export { default } from '../server/appVercel';
