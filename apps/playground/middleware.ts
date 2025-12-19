@@ -1,11 +1,11 @@
 import { next } from '@vercel/edge';
 
 /**
- * Vercel Edge Middleware - API認証のみ
- * @description /api/v1/* のみBasic認証を適用
+ * Vercel Edge Middleware - 全画面Basic認証
+ * @description アプリ全体にBasic認証を適用（静的ファイル含む）
  */
 export const config = {
-  matcher: ['/api/v1/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
 
 /**
@@ -42,6 +42,13 @@ const unauthorizedResponse = (): Response => {
  * Vercel Edge Middleware エントリーポイント
  */
 export default async function middleware(request: Request) {
+  const url = new URL(request.url);
+
+  // ヘルスチェックは認証スキップ
+  if (url.pathname === '/health') {
+    return next();
+  }
+
   // Basic認証チェック
   const authHeader = request.headers.get('Authorization');
   if (!verifyCredentials(authHeader)) {
