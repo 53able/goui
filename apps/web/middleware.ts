@@ -1,31 +1,42 @@
 import { next } from '@vercel/edge';
-import { Hono } from 'hono';
-import { basicAuth } from 'hono/basic-auth';
 
 /**
- * Vercel Edge Middleware - Basic認証（Hono版）
+ * Vercel Edge Middleware - Basic認証
  * @description アプリ全体にBasic認証を適用（静的ファイル含む）
- * @note Honoの basicAuth ミドルウェアを使用し、認証後は next() で続行
  */
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
 
 /**
- * 認証用Honoアプリ
+ * Basic認証のクレデンシャルを検証
  */
-const authApp = new Hono();
+const verifyCredentials = (authHeader: string | null): boolean => {
+  if (!authHeader?.startsWith('Basic ')) {
+    return false;
+  }
 
-authApp.use(
-  '*',
-  basicAuth({
-    username: process.env.BASIC_AUTH_USERNAME ?? 'admin',
-    password: process.env.BASIC_AUTH_PASSWORD ?? 'admin',
-  }),
-);
+  const base64Credentials = authHeader.slice(6);
+  const credentials = atob(base64Credentials);
+  const [username, password] = credentials.split(':');
 
-// 認証成功時は 200 を返す（この後 next() に切り替える）
-authApp.all('*', (c) => c.text('ok'));
+  const expectedUsername = process.env.BASIC_AUTH_USERNAME ?? 'admin';
+  const expectedPassword = process.env.BASIC_AUTH_PASSWORD ?? 'admin';
+
+  return username === expectedUsername && password === expectedPassword;
+};
+
+/**
+ * 401 Unauthorized レスポンスを返す
+ */
+const unauthorizedResponse = (): Response => {
+  return new Response('Unauthorized', {
+    status: 401,
+    headers: {
+      'WWW-Authenticate': 'Basic realm="Secure Area"',
+    },
+  });
+};
 
 /**
  * Vercel Edge Middleware エントリーポイント
@@ -38,12 +49,10 @@ export default async function middleware(request: Request) {
     return next();
   }
 
-  // Hono で Basic 認証チェック
-  const authResponse = await authApp.fetch(request);
-
-  // 認証失敗（401）ならそのまま返す
-  if (authResponse.status === 401) {
-    return authResponse;
+  // Basic認証チェック
+  const authHeader = request.headers.get('Authorization');
+  if (!verifyCredentials(authHeader)) {
+    return unauthorizedResponse();
   }
 
   // 認証成功なら元のリクエストを続行
