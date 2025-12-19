@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import * as shared from '@goui/shared';
 
 /**
  * Vercel Functions向けのHonoアプリケーション（切り分け用）
@@ -26,7 +27,14 @@ const createApp = () => {
       (allowedTargets as readonly string[]).includes(value);
 
     if (!target || !isAllowed(target)) {
-      return c.json({ ok: false, error: 'invalid_target', allowedTargets }, 400);
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid_target',
+          allowedTargets,
+        },
+        400,
+      );
     }
 
     try {
@@ -36,10 +44,21 @@ const createApp = () => {
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error');
       return c.json(
-        { ok: false, target, name: error.name, message: error.message, stack: error.stack },
+        {
+          ok: false,
+          target,
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        },
         500,
       );
     }
+  });
+
+  app.get('/api/debug/static', (c) => {
+    const keys = Object.keys(shared as Record<string, unknown>);
+    return c.json({ ok: true, keys });
   });
 
   return app;
