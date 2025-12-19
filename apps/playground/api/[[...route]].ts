@@ -52,23 +52,37 @@ const readBody = async (req: NodeReq) => {
 };
 
 export default async (req: NodeReq, res: NodeRes) => {
-  const url = toUrl(req);
-  const headers = toHeaders(req);
-  const body = await readBody(req);
+  try {
+    const url = toUrl(req);
+    const headers = toHeaders(req);
+    const body = await readBody(req);
 
-  const request = new Request(url, {
-    method: req.method,
-    headers,
-    body,
-  });
+    const request = new Request(url, {
+      method: req.method,
+      headers,
+      body,
+    });
 
-  const response = await app.fetch(request);
-  res.statusCode = response.status;
+    const response = await app.fetch(request);
+    res.statusCode = response.status;
 
-  response.headers.forEach((value, key) => {
-    res.setHeader(key, value);
-  });
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
 
-  const arrayBuffer = await response.arrayBuffer();
-  res.end(Buffer.from(arrayBuffer));
+    const arrayBuffer = await response.arrayBuffer();
+    res.end(Buffer.from(arrayBuffer));
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Unknown error');
+    res.statusCode = 500;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(
+      JSON.stringify({
+        ok: false,
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      }),
+    );
+  }
 };
