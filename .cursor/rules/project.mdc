@@ -6,7 +6,7 @@ alwaysApply: true
 
 # UI Sample Admin - Project Rules
 
-> React Admin管理画面ボイラープレート開発時のAIコーディングアシスタント向けコンテキスト
+> pnpm workspaces + Turborepo によるモノレポ構成の管理画面ボイラープレート
 
 ---
 
@@ -14,83 +14,151 @@ alwaysApply: true
 
 | 項目 | 内容 |
 |------|------|
-| **名称** | UI Sample Admin |
+| **構成** | pnpm workspaces + Turborepo モノレポ |
 | **目的** | エンタープライズ級管理画面の高速構築 |
-| **アーキテクチャ** | React 19 + shadcn/ui + React Admin + Zustand + Hono |
+| **アーキテクチャ** | React 19 + shadcn/ui + Hono |
+
+> 📝 以下のドキュメントでは `@myorg/*` をパッケージ名のプレースホルダーとして使用。実際のプロジェクトに合わせて変更してください。
+
+---
+
+## 📦 Monorepo Structure
+
+```
+project-root/
+├── apps/
+│   ├── web/                    # @myorg/web - メインWebアプリ
+│   │   ├── src/                # フロントエンドソース
+│   │   ├── server/             # Hono APIサーバー
+│   │   ├── api/                # Vercel Edge Functions
+│   │   ├── package.json
+│   │   ├── vite.config.ts
+│   │   └── vercel.json
+│   │
+│   └── admin/                  # @myorg/admin - 管理画面（例）
+│       ├── src/
+│       ├── package.json
+│       └── vite.config.ts
+│
+├── packages/
+│   ├── shared/                 # @myorg/shared - 共有スキーマ・型定義
+│   │   ├── src/
+│   │   │   ├── schemas.ts      # Zodスキーマ（型の単一ソース）
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   ├── ui/                     # @myorg/ui - 共有UIコンポーネント
+│   │   ├── src/
+│   │   │   ├── AlertDialog.tsx
+│   │   │   ├── Button.tsx
+│   │   │   ├── Checkbox.tsx
+│   │   │   ├── Input.tsx
+│   │   │   ├── Toaster.tsx     # sonner ベースのトースト
+│   │   │   ├── utils.ts        # cn() 関数
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   └── ai/                     # @myorg/ai - AI SDK 共有パッケージ
+│       ├── src/
+│       │   ├── index.ts        # AI SDK コア機能エクスポート
+│       │   ├── react.ts        # React用情報
+│       │   └── agents/         # 共有エージェント定義
+│       │       └── chatAgent.ts
+│       └── package.json
+│
+├── pnpm-workspace.yaml         # ワークスペース定義
+├── turbo.json                  # Turborepo タスク定義
+├── package.json                # ルート（共通devDeps + turboスクリプト）
+├── biome.json                  # 共通Lint/Format設定
+└── tsconfig.json               # ルートTS設定（references）
+```
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend
+### Monorepo Tools
+
+| ツール | バージョン | 用途 |
+|--------|-----------|------|
+| **pnpm** | ^9.1.1 | パッケージマネージャー（workspaces） |
+| **Turborepo** | ^2.5.4 | モノレポビルドツール |
+
+### Frontend (apps/*)
 
 | カテゴリ | 技術 | バージョン | 用途 |
 |---------|------|-----------|------|
 | **Core** | React | ^19.2.3 | UIフレームワーク |
 | **Core** | TypeScript | ~5.9.3 | 型安全性（strict mode） |
-| **Core** | tsgo | @typescript/native-preview | 高速型チェック（Go native） |
 | **Core** | Vite | ^7.3.0 | ビルドツール |
-| **UI** | shadcn/ui | - | Radix UIベースコンポーネント |
 | **UI** | Tailwind CSS | ^4.1.18 | スタイリング（CSS-first config） |
-| **UI** | React Admin | ^5.13.4 | 管理画面フレームワーク |
+| **UI** | lucide-react | ^0.561.0 | アイコンライブラリ |
+| **UI** | next-themes | ^0.4.6 | テーマ切り替え |
+| **UI** | tailwindcss-animate | ^1.0.7 | アニメーション |
+| **Data** | @tanstack/react-query | ^5.90.12 | データフェッチング・キャッシュ |
+| **Data** | @tanstack/react-table | ^8.21.3 | テーブル管理 |
 | **State** | Zustand | ^5.0.9 | クライアント状態管理 |
-| **State** | TanStack Query | ^5.90.12 | サーバー状態管理 |
 | **Form** | React Hook Form | ^7.68.0 | フォーム管理 |
 | **Schema** | Zod | ^4.2.1 | スキーマバリデーション |
+| **Admin** | react-admin | ^5.13.4 | 管理画面フレームワーク |
 | **Quality** | Biome | ^2.3.9 | Lint + Format |
 | **Test** | Vitest | ^4.0.16 | テスト |
 
-### Backend
+### Backend (apps/web/server/)
 
 | カテゴリ | 技術 | バージョン | 用途 |
 |---------|------|-----------|------|
 | **Core** | Hono | ^4.11.1 | 軽量・高速Webフレームワーク |
-| **Core** | TypeScript | ~5.9.3 | 型安全性（strict mode） |
+| **Server** | @hono/node-server | ^1.19.7 | Node.jsサーバーアダプター |
 | **Schema** | @hono/zod-openapi | ^1.1.5 | Zodスキーマ + OpenAPI統合 |
-| **Validation** | Zod | ^4.2.1 | スキーマバリデーション |
+| **Docs** | @scalar/hono-api-reference | ^0.9.28 | APIドキュメント UI |
 | **RPC** | hono/client | - | 型安全なクライアント通信 |
 | **Runtime** | Node.js | >=20.0.0 | 実行環境（tsx使用） |
 
+### AI (packages/ai)
+
+| カテゴリ | 技術 | バージョン | 用途 |
+|---------|------|-----------|------|
+| **Core** | ai | beta | Vercel AI SDK 6 コア |
+| **Provider** | @ai-sdk/openai | beta | OpenAI プロバイダー |
+| **React** | @ai-sdk/react | beta | React フック（useChat等） |
+
+> 📝 AI SDK 環境変数の詳細は `.cursor/rules/ai-environment.mdc` を参照
+
 ---
 
-## ⚠️ 重要な技術的変更点
-
-### TypeScript 7 (tsgo) の破壊的変更
+## 🔧 Import Rules（モノレポ）
 
 ```typescript
-// ❌ 廃止されたオプション（tsconfig.json）
-{
-  "compilerOptions": {
-    "baseUrl": "."  // TS7で削除
-  }
-}
+// ✅ 共有パッケージからインポート
+import { Button, Input, cn, toast } from '@myorg/ui';
+import { UserSchema, type User } from '@myorg/shared';
+import { openai, generateText, chatAgent } from '@myorg/ai';
 
-// ✅ pathsのみで動作
+// ✅ React用AIフック（各アプリで @ai-sdk/react を直接使用）
+import { useChat } from '@ai-sdk/react';
+
+// ✅ アプリ内パスエイリアス（@/）
+import { useTodoStore } from '@/stores';
+import { Tetris } from '@/components/admin/Tetris';
+
+// ❌ 相対パスでの共有パッケージ参照は禁止
+import { Button } from '../../packages/ui/src/Button';
+```
+
+### workspace:* 依存関係
+
+```json
+// apps/*/package.json
 {
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+  "dependencies": {
+    "@myorg/ai": "workspace:*",
+    "@myorg/shared": "workspace:*",
+    "@myorg/ui": "workspace:*",
+    "@ai-sdk/react": "beta"
   }
 }
 ```
-
-### Tailwind CSS v4 の設定方式
-
-```css
-/* src/index.css - CSS-first configuration */
-@import 'tailwindcss';
-
-@plugin 'tailwindcss-animate';
-
-@theme {
-  --color-primary: hsl(var(--primary));
-  --color-background: hsl(var(--background));
-  /* ... */
-}
-```
-
-> 📝 `tailwind.config.js` は不要。すべてCSSファイル内で設定。
 
 ---
 
@@ -115,7 +183,7 @@ interface User {
   name: string;
 }
 
-// ✅ GOOD
+// ✅ GOOD - packages/shared で定義
 const UserSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -135,58 +203,24 @@ const newCount = count + 1;
 const newItems = [...items, newItem];
 ```
 
-### コンポーネント内での直接モックデータ定義禁止
+### UIコンポーネントの重複定義禁止
 
 ```typescript
-// ❌ BAD
-const UserList = () => {
-  const mockUsers = [{ id: 1, name: "テスト" }];
-  return <UserTable data={mockUsers} />;
-};
+// ❌ BAD - apps内でUIコンポーネントを再定義
+// apps/web/src/components/ui/Button.tsx
 
-// ✅ GOOD - Zustandストア経由
-const UserList = () => {
-  const { users } = useUserStore();
-  return <UserTable data={users} />;
-};
+// ✅ GOOD - packages/uiから使用
+import { Button } from '@myorg/ui';
 ```
-
-### バックエンドでの型安全でないルート定義禁止
-
-```typescript
-// ❌ BAD
-app.get('/users/:id', (c) => {
-  const id = c.req.param('id'); // 型がstring | undefined
-  return c.json({ id });
-});
-
-// ❌ BAD - バリデーションなし
-app.post('/users', async (c) => {
-  const body = await c.req.json(); // any型
-  return c.json(body);
-});
-```
-
-### 非推奨（deprecated）APIの使用禁止
-
-```typescript
-// ❌ BAD - @deprecated マークのあるAPI
-import { apiReference } from '@scalar/hono-api-reference';
-
-// ✅ GOOD - 最新の推奨API
-import { Scalar } from '@scalar/hono-api-reference';
-```
-
-> 💡 IDEで `@deprecated` 警告が出たら、パッケージのドキュメントや型定義を確認して最新APIに移行すること。
 
 ---
 
 ## ✅ REQUIRED - 必須パターン
 
-### Pattern 1: Zodスキーマファースト
+### Pattern 1: Zodスキーマファースト（packages/shared）
 
 ```typescript
-// shared/schemas.ts
+// packages/shared/src/schemas.ts
 import { z } from 'zod';
 
 export const UserSchema = z.object({
@@ -199,7 +233,7 @@ export const UserSchema = z.object({
 
 export type User = z.infer<typeof UserSchema>;
 
-// 作成用スキーマ（idとcreatedAtを除外）
+// 作成用スキーマ
 export const CreateUserSchema = UserSchema.omit({ 
   id: true, 
   createdAt: true 
@@ -207,156 +241,38 @@ export const CreateUserSchema = UserSchema.omit({
 export type CreateUser = z.infer<typeof CreateUserSchema>;
 ```
 
-### Pattern 2: Zustandストア定義
+### Pattern 2: 共有UIコンポーネント（packages/ui）
+
+> 📦 **主要依存関係**: `class-variance-authority` (CVA), `clsx` + `tailwind-merge`, `sonner`, `lucide-react`, `@radix-ui/*`
 
 ```typescript
-// stores/userStore.ts
-import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import type { User, CreateUser } from '@/shared/schemas';
+// packages/ui/src/Button.tsx
+import { cn } from './utils.js';
+import { cva, type VariantProps } from 'class-variance-authority';
 
-interface UserStore {
-  users: User[];
-  isLoading: boolean;
-  getUsers: () => User[];
-  addUser: (user: CreateUser) => void;
-  updateUser: (id: string, updates: Partial<User>) => void;
-  deleteUser: (id: string) => void;
-}
-
-export const useUserStore = create<UserStore>()(
-  devtools(
-    (set, get) => ({
-      users: [],
-      isLoading: false,
-      getUsers: () => get().users,
-      addUser: (item) => {
-        const newUser = { ...item, id: crypto.randomUUID(), createdAt: new Date() };
-        set((state) => ({ users: [...state.users, newUser] }));
-      },
-      updateUser: (id, updates) => {
-        set((state) => ({
-          users: state.users.map((user) => 
-            user.id === id ? { ...user, ...updates } : user
-          ),
-        }));
-      },
-      deleteUser: (id) => {
-        set((state) => ({ users: state.users.filter((user) => user.id !== id) }));
-      },
-    }),
-    { name: 'user-store' }
-  )
-);
-```
-
-### Pattern 3: フォーム実装（React Hook Form + Zod）
-
-```typescript
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateUserSchema, type CreateUser } from '@/shared/schemas';
-
-const UserForm: React.FC = () => {
-  const { addUser } = useUserStore();
-  const form = useForm<CreateUser>({
-    resolver: zodResolver(CreateUserSchema),
-    defaultValues: { name: '', email: '', status: 'pending' },
-  });
-
-  const onSubmit = (data: CreateUser) => {
-    addUser(data);
-    form.reset();
-  };
-
-  return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
-      {/* フォームフィールド */}
-    </form>
-  );
-};
-```
-
-### Pattern 4: Hono APIルート定義（@hono/zod-openapi v1.x）
-
-```typescript
-// api/routes/users/routes.ts
-import { createRoute, z } from '@hono/zod-openapi';
-import { UserSchema, CreateUserSchema } from '@/shared/schemas';
-
-export const listUsersRoute = createRoute({
-  method: 'get',
-  path: '/users',
-  tags: ['users'],
-  summary: 'ユーザー一覧取得',
-  responses: {
-    200: {
-      content: {
-        'application/json': {
-          schema: z.object({ users: z.array(UserSchema) }),
-        },
-      },
-      description: 'ユーザー一覧',
-    },
-  },
+const buttonVariants = cva('...base styles...', {
+  variants: { variant: { default: '...', destructive: '...' } },
 });
 
-export const createUserRoute = createRoute({
-  method: 'post',
-  path: '/users',
-  tags: ['users'],
-  summary: 'ユーザー作成',
-  request: {
-    body: {
-      content: { 'application/json': { schema: CreateUserSchema } },
-      required: true,
-    },
-  },
-  responses: {
-    201: {
-      content: { 'application/json': { schema: UserSchema } },
-      description: '作成されたユーザー',
-    },
-  },
-});
+export const Button: FC<ButtonProps & VariantProps<typeof buttonVariants>> = (
+  { className, variant, ...props }
+) => <button className={cn(buttonVariants({ variant }), className)} {...props} />;
+
+// packages/ui/src/index.ts
+export { AlertDialog, AlertDialogAction, ... } from './AlertDialog.js';
+export { Button, buttonVariants } from './Button.js';
+export { Checkbox } from './Checkbox.js';
+export { Input } from './Input.js';
+export { Toaster, toast } from './Toaster.js';
+export { cn } from './utils.js';
 ```
 
-### Pattern 5: Hono RPCクライアント（フロントエンド連携）
+### Pattern 3: アプリからの共有パッケージ利用
 
 ```typescript
-// lib/apiClient.ts
-import { hc } from 'hono/client';
-import type { AppType } from '../api';
-
-export const apiClient = hc<AppType>('http://localhost:3000');
-
-// hooks/useApiUsers.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-
-export const useApiUsers = () => 
-  useQuery({
-    queryKey: ['users'],
-    queryFn: async () => {
-      const res = await apiClient.api.v1.users.$get();
-      if (!res.ok) throw new Error('Failed to fetch users');
-      return res.json();
-    },
-  });
-
-export const useCreateUser = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (data: CreateUser) => {
-      const res = await apiClient.api.v1.users.$post({ json: data });
-      if (!res.ok) throw new Error('Failed to create user');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
-  });
-};
+// apps/web/src/components/admin/TodoList.tsx
+import { Button, Input, AlertDialog, cn, toast } from '@myorg/ui';
+import type { User } from '@myorg/shared';
 ```
 
 ---
@@ -365,79 +281,20 @@ export const useCreateUser = () => {
 
 | 種類 | 規則 | 例 |
 |------|------|-----|
+| **パッケージ名** | `@myorg/*` | `@myorg/web`, `@myorg/ui` |
 | **コンポーネント** | `PascalCase.tsx` | `UserList.tsx` |
 | **ユーティリティ** | `camelCase.ts` | `formatDate.ts` |
 | **ストア** | `camelCaseStore.ts` | `userStore.ts` |
-| **スキーマ** | `schemas.ts` / `*.schema.ts` | `user.schema.ts` |
+| **スキーマ** | `schemas.ts` | `packages/shared/src/schemas.ts` |
 | **テスト** | `*.test.ts` / `*.test.tsx` | `UserList.test.tsx` |
 | **ファイル名** | 最大4単語連結 | `userListTable.tsx` |
 | **Gitブランチ** | 最大4単語連結 | `feature/user-list-table` |
 
 ---
 
-## 🔧 Import Rules
-
-```typescript
-// ✅ パスエイリアス使用
-import { Button } from '@/components/ui/button';
-import { useUserStore } from '@/stores';
-
-// ✅ 一括インポート（UIコンポーネント）
-import { Button, Card, Dialog } from '@/components/ui';
-
-// ✅ 管理画面コンポーネント
-import { AdminApp, Dashboard } from '@/components';
-```
-
----
-
-## 📊 State Management Guidelines
-
-| 状態の種類 | 管理方法 | 具体例 |
-|-----------|---------|--------|
-| **クライアント状態** | Zustand | サイドバー開閉、選択中タブ、モーダル表示、テーマ設定 |
-| **サーバー状態** | TanStack Query | API取得データ、キャッシュ、ローディング/エラー状態 |
-| **フォーム状態** | React Hook Form | 入力値、バリデーション結果、送信状態 |
-
-> ⚠️ `useState` はコンポーネント固有の一時的なUI状態（ホバー状態など）にのみ使用可。共有される状態は必ずZustandストアへ。
-
----
-
-## 📂 Directory Structure
-
-```
-project-root/
-├── src/                        # フロントエンド
-│   ├── components/
-│   │   ├── admin/              # 管理画面コンポーネント
-│   │   └── ui/                 # shadcn/ui コンポーネント
-│   ├── stores/                 # Zustand ストア
-│   ├── hooks/                  # カスタムフック（API連携含む）
-│   ├── lib/
-│   │   ├── utils.ts
-│   │   └── apiClient.ts        # Hono RPCクライアント
-│   ├── index.css               # Tailwind v4 設定（@theme）
-│   └── testing/
-│
-├── api/                        # バックエンド（Hono）
-│   ├── index.ts                # メインアプリ（AppType export）
-│   ├── server.ts               # 開発用サーバー（API認証のみ）
-│   ├── production.ts           # 本番用サーバー（全画面認証）
-│   ├── routes/                 # APIルート
-│   ├── services/               # ビジネスロジック
-│   └── middleware/             # カスタムミドルウェア
-│
-└── shared/                     # フロント/バック共通
-    └── schemas.ts              # Zodスキーマ（型定義の単一ソース）
-```
-
-> 🔑 **Key Point**: `shared/schemas.ts` がフロントエンド/バックエンド両方から参照される型の単一ソース
-
----
-
 ## ✅ Quality Gates
 
-コミット前に必ず実行：
+コミット前に必ず実行（Turborepoで並列実行）：
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm test && pnpm build
@@ -445,90 +302,128 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 
 **全てパスしない限りコミット禁止** 🚫
 
-> 💡 `pnpm typecheck` は tsgo（Go native）で高速実行。互換用に `pnpm typecheck:tsc` も使用可。
-
----
-
-## 🎨 UI Components (shadcn/ui)
-
-### カテゴリ別
-
-| カテゴリ | コンポーネント |
-|---------|---------------|
-| **Form** | Button, Input, Label, Textarea, Checkbox, Switch |
-| **Layout** | Card, Tabs, Sidebar, NavigationMenu |
-| **Data** | Table, Badge, Avatar, Progress |
-| **Overlay** | Dialog, Sheet, Popover, Tooltip |
-| **Menu** | DropdownMenu, ContextMenu, Command |
-| **Admin** | AdminApp, AppSidebar, AppNavbar, Dashboard, DataTable |
-
----
-
-## 🔧 Configuration Files
-
-| ファイル | 用途 |
-|---------|------|
-| `tsconfig.json` | TypeScript基本設定 |
-| `tsconfig.app.json` | フロントエンド用TS設定 |
-| `tsconfig.node.json` | バックエンド/ビルドツール用TS設定 |
-| `vite.config.ts` | Vite設定（パスエイリアス、@tailwindcss/vite） |
-| `src/index.css` | Tailwind v4設定（@theme、CSS変数） |
-| `biome.json` | コード品質設定 |
-| `components.json` | shadcn/ui設定 |
-| `.env.example` | 環境変数テンプレート（→ `.env` にコピー） |
-
----
-
-## 🔐 API Authentication
-
-### Basic認証設定
-
-| 項目 | 値 | 環境変数 |
-|------|-----|---------|
-| **ユーザー名** | `admin` | `BASIC_AUTH_USERNAME` |
-| **パスワード** | `admin` | `BASIC_AUTH_PASSWORD` |
-
-> ⚠️ **セキュリティ注意**: 上記はデフォルト値（開発用）です。本番環境では `.env` で必ず変更してください。
-
-### 認証範囲
-
-| 環境 | エンドポイント | 認証 | 説明 |
-|------|---------------|------|------|
-| **開発** | `/api/v1/*` | 🔐 必要 | APIルートのみ |
-| **開発** | `/health`, `/api/doc`, `/api/ui` | ✅ 不要 | 公開エンドポイント |
-| **開発** | `localhost:5173` | ✅ 不要 | Vite開発サーバー |
-| **本番** | `/*` | 🔐 必要 | 全画面（SPA + API） |
-| **本番** | `/health` | ✅ 不要 | ヘルスチェックのみ |
-
-### フロントエンドからのAPI呼び出し
-
-```typescript
-// Authorization ヘッダーを付与
-const credentials = btoa('admin:admin');
-const response = await fetch('/api/v1/users', {
-  headers: {
-    'Authorization': `Basic ${credentials}`,
-  },
-});
-```
-
 ---
 
 ## 🚦 Endpoints
 
 ### 開発環境
 
-| URL | 説明 |
-|-----|------|
-| `http://localhost:5173` | フロントエンド開発サーバー |
-| `http://localhost:3000` | バックエンドAPIサーバー |
-| `http://localhost:3000/api/ui` | Swagger UI |
-| `http://localhost:3000/api/doc` | OpenAPI JSON |
+| URL | アプリ | 説明 |
+|-----|--------|------|
+| `http://localhost:5173` | @myorg/web | メインWebアプリ |
+| `http://localhost:5174` | @myorg/admin | 管理画面 |
+| `http://localhost:3000` | API | バックエンドAPIサーバー |
+| `http://localhost:3000/api/ui` | API | Swagger UI |
+| `http://localhost:3000/api/doc` | API | OpenAPI JSON |
 
-### 本番環境
+### Vercel環境（マルチプロジェクト）
 
-| URL | 説明 |
-|-----|------|
-| `http://localhost:3000` | SPA + API（全画面認証） |
-| `http://localhost:3000/api/ui` | Swagger UI（認証必要） |
-| `http://localhost:3000/health` | ヘルスチェック（認証不要） |
+| プロジェクト | Root Directory | URL |
+|-------------|----------------|-----|
+| myorg-web | `apps/web` | `https://myorg-web.vercel.app` |
+| myorg-admin | `apps/admin` | `https://myorg-admin.vercel.app` |
+
+---
+
+## 🔧 Configuration Files
+
+| ファイル | 場所 | 用途 |
+|---------|------|------|
+| `pnpm-workspace.yaml` | ルート | ワークスペース定義 |
+| `turbo.json` | ルート | Turborepoタスク定義 |
+| `package.json` | ルート | 共通devDeps + turboスクリプト |
+| `biome.json` | ルート | 共通Lint/Format設定 |
+| `tsconfig.json` | ルート | TSプロジェクトreferences |
+| `vite.config.ts` | 各apps/* | Viteビルド設定 |
+| `vercel.json` | 各apps/* | Vercelデプロイ設定 |
+
+---
+
+## 🆕 新しいアプリの追加方法
+
+> 📝 詳細な手順は `.cursor/commands/setup.md` を参照
+
+### 必要なファイル一覧
+
+| ファイル | 用途 |
+|---------|------|
+| `package.json` | パッケージ定義（`@myorg/shared`, `@myorg/ui` を依存に追加） |
+| `tsconfig.json` | TypeScript設定（パスエイリアス `@/*` 含む） |
+| `vite.config.ts` | Viteビルド設定（ポート番号の重複に注意） |
+| `index.html` | HTMLエントリーポイント |
+| `src/index.css` | Tailwind CSS v4 設定（CSS-first config） |
+| `src/main.tsx` | Reactエントリーポイント |
+| `src/App.tsx` | ルートコンポーネント |
+
+### ポート番号の割り当て
+
+| アプリ | ポート |
+|--------|--------|
+| @myorg/web | 5173 |
+| @myorg/admin | 5174 |
+| 新アプリ | 5175〜 |
+
+### クイックスタート
+
+```bash
+# 1. ディレクトリ作成
+mkdir -p apps/新アプリ/src
+
+# 2. 各ファイルを作成（setup.md参照）
+
+# 3. 依存関係インストール
+pnpm install
+
+# 4. 開発サーバー起動
+pnpm --filter @myorg/新アプリ dev
+```
+
+### 完了チェックリスト
+
+- [ ] `http://localhost:ポート番号` でアプリが表示される
+- [ ] `@myorg/ui` のコンポーネントが動作する
+- [ ] `pnpm typecheck` が通る
+- [ ] `pnpm lint` が通る
+
+---
+
+## 🔐 Environment Variables
+
+### 必須環境変数
+
+| 項目 | 環境変数 | 説明 |
+|------|---------|------|
+| **OpenAI APIキー** | `OPENAI_API_KEY` | AI機能に必須 |
+| **Basic認証ユーザー** | `BASIC_AUTH_USERNAME` | API認証（デフォルト: admin） |
+| **Basic認証パスワード** | `BASIC_AUTH_PASSWORD` | API認証（デフォルト: admin） |
+
+> ⚠️ **セキュリティ注意**: デフォルト値は開発用です。本番環境では `.env` で必ず変更してください。
+> 📝 AI API キーの詳細は `.cursor/rules/ai-environment.mdc` を参照
+
+### ローカル環境（.env）
+
+```bash
+# プロジェクトルートに .env ファイルを作成
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+BASIC_AUTH_USERNAME=admin
+BASIC_AUTH_PASSWORD=admin
+```
+
+### Vercel環境変数の設定
+
+```bash
+# 対話式で設定
+vercel env add OPENAI_API_KEY production
+vercel env add BASIC_AUTH_USERNAME production
+
+# .envファイルから一括設定
+while IFS='=' read -r key value; do
+  [[ -z "$key" || "$key" =~ ^# ]] && continue
+  echo "$value" | vercel env add "$key" production --yes
+done < .env.production
+
+# Vercelからローカルへ取得
+vercel env pull .env.local
+```
+
+> 📝 詳細は `.cursor/commands/setup.md` の「環境変数の一括設定」を参照

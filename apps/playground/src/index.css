@@ -1,0 +1,160 @@
+@import "tailwindcss";
+
+/* ============================================
+   Life Game - Mobile First CSS
+   ============================================ */
+
+@theme {
+  /* === Base Colors === */
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(222.2 84% 4.9%);
+  --color-muted: hsl(210 20% 96%);
+  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
+  --color-primary: hsl(222.2 47.4% 11.2%);
+  --color-primary-foreground: hsl(210 40% 98%);
+
+  /* === Game Colors === */
+  --color-cell-alive: hsl(142 76% 36%);
+  --color-cell-dead: hsl(210 20% 96%);
+  --color-grid-border: hsl(215 20% 85%);
+
+  /* === Layout === */
+  --spacing-safe-top: env(safe-area-inset-top, 0px);
+  --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --spacing-safe-left: env(safe-area-inset-left, 0px);
+  --spacing-safe-right: env(safe-area-inset-right, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-background: hsl(222.2 84% 4.9%);
+    --color-foreground: hsl(210 40% 98%);
+    --color-muted: hsl(222 30% 12%);
+    --color-muted-foreground: hsl(215 20.2% 65.1%);
+    --color-primary: hsl(210 40% 98%);
+    --color-primary-foreground: hsl(222.2 47.4% 11.2%);
+    --color-cell-alive: hsl(142 70% 45%);
+    --color-cell-dead: hsl(222 30% 15%);
+    --color-grid-border: hsl(215 20% 30%);
+  }
+}
+
+/* ============================================
+   App Layout - Pancake Stack Pattern
+   ============================================ */
+.app-layout {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100dvh;
+  padding-top: var(--spacing-safe-top);
+  padding-bottom: var(--spacing-safe-bottom);
+  padding-left: var(--spacing-safe-left);
+  padding-right: var(--spacing-safe-right);
+}
+
+/* ============================================
+   Responsive Title - Clamping Pattern
+   ============================================ */
+.game-title {
+  font-size: clamp(1.75rem, 6vw, 3rem);
+}
+
+.game-subtitle {
+  font-size: clamp(0.75rem, 2.5vw, 1rem);
+}
+
+/* ============================================
+   Controls - Deconstructed Pancake Pattern
+   ============================================ */
+.controls-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .controls-grid {
+    gap: 0.75rem;
+  }
+}
+
+/* ============================================
+   Canvas Container - Responsive with aspect-ratio
+   ============================================ */
+.canvas-container {
+  width: 100%;
+  max-width: min(90vw, 640px);
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .canvas-container {
+    max-width: min(85vw, 800px);
+  }
+}
+
+/* ============================================
+   Form Controls - Mobile Optimized
+   ============================================ */
+.slider-control {
+  width: clamp(8rem, 30vw, 12rem);
+}
+
+.select-control {
+  min-width: 4rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  touch-action: manipulation;
+}
+
+/* ============================================
+   Touch-friendly interactions
+   ============================================ */
+@media (pointer: coarse) {
+  /* タッチデバイスでの大きなタップターゲット */
+  button,
+  select,
+  input[type="range"] {
+    min-height: 44px;
+  }
+
+  /* ホバー効果を無効化 */
+  .no-hover-on-touch:hover {
+    background-color: inherit;
+  }
+}
+
+/* ============================================
+   Hide keyboard shortcuts on mobile
+   ============================================ */
+.keyboard-hints {
+  display: none;
+}
+
+@media (pointer: fine) and (min-width: 768px) {
+  .keyboard-hints {
+    display: block;
+  }
+}
+
+/* ============================================
+   Generation counter - Responsive
+   ============================================ */
+.generation-count {
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+}
+
+/* ============================================
+   Status badge
+   ============================================ */
+.status-badge {
+  font-size: clamp(0.7rem, 2vw, 0.875rem);
+  padding: 0.25rem 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .status-badge {
+    padding: 0.375rem 1rem;
+  }
+}

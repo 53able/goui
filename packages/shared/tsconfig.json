@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2023"],
@@ -9,12 +8,11 @@
     "strict": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
   },
-  "references": [
-    { "path": "packages/shared" },
-    { "path": "packages/ui" },
-    { "path": "apps/web" }
-  ],
-  "include": []
+  "include": ["src/**/*"]
 }
+
