@@ -1,9 +1,7 @@
-import { handle } from 'hono/vercel';
-import app from '../server/app';
-
 /**
- * Vercel Functions用ハンドラー（Node.js Runtime）
- * @description 全てのAPIリクエストをHonoアプリにルーティング
+ * Vercel Functions エントリポイント
+ * @description Hono公式のVercel向け手順に従い、Honoアプリを default export する
+ * @see https://hono.dev/docs/getting-started/vercel
  * @note 認証は middleware.ts（Edge Middleware）で適用
  */
-export default handle(app);
+export { default } from '../server/app';
