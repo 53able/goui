@@ -1,6 +1,5 @@
 import type { ApiError } from '@goui/shared';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { Scalar } from '@scalar/hono-api-reference';
 import type { Context, Next } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
@@ -71,14 +70,6 @@ app.doc('/api/doc', {
     },
   ],
 });
-
-// Swagger UI (Scalar)
-app.get(
-  '/api/ui',
-  Scalar({
-    url: '/api/doc',
-  }),
-);
 
 // ============ エラーハンドリング ============
 
