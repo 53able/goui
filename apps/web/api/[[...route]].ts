@@ -1,15 +1,28 @@
+import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
-import app from '../server/app.js';
 
 /**
  * Vercel Serverless Functions用ハンドラー（Node.js Runtime）
- * @description 全てのAPIリクエストをHonoアプリにルーティング
- * @note 認証は middleware.ts で全体適用済み
- * @note Edge Runtime では @goui/shared 等がサポートされないため nodejs を使用
+ * @description テスト用シンプルHonoアプリ
  */
 export const config = {
   runtime: 'nodejs',
   maxDuration: 30,
 };
+
+// テスト用シンプルアプリ
+const app = new Hono();
+
+app.get('/health', (c) => {
+  return c.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '0.1.0-test',
+  });
+});
+
+app.get('/api/test', (c) => {
+  return c.json({ message: 'Hello from Hono on Vercel!' });
+});
 
 export default handle(app);
