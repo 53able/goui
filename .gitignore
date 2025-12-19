@@ -31,6 +31,9 @@ tmp/
 # Vite
 .vite/
 
+# Turborepo
+.turbo/
+
 # TypeScript
 *.tsbuildinfo
 .vercel

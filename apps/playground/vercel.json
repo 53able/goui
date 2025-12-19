@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@goui/playground",
+  "installCommand": "cd ../.. && pnpm install",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "regions": ["hnd1"],
+  "rewrites": [
+    {
+      "source": "/health",
+      "destination": "/api/[[...route]]"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/[[...route]]"
+    },
+    {
+      "source": "/((?!assets/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

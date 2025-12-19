@@ -1,0 +1,195 @@
+---
+description: AI SDK 6 Beta の環境変数設定ガイド（OpenAI, Anthropic, Google AI, Azure OpenAI）
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: false
+---
+
+# AI API 環境変数設定ガイド
+
+> @goui/ai パッケージで使用する AI プロバイダーの環境変数設定
+
+---
+
+## 必要な環境変数
+
+### OpenAI (デフォルト)
+
+```bash
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+> 🔗 APIキー取得: https://platform.openai.com/api-keys
+
+---
+
+## 設定方法
+
+### 1. ローカル開発環境
+
+プロジェクトルートに `.env` ファイルを作成:
+
+```bash
+# goui/ (プロジェクトルート)
+touch .env
+echo "OPENAI_API_KEY=sk-your-key-here" >> .env
+```
+
+#### .env ファイル例
+
+```bash
+# AI API Keys
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Basic認証 (開発用)
+BASIC_AUTH_USERNAME=admin
+BASIC_AUTH_PASSWORD=admin
+```
+
+> ⚠️ `.env` は `.gitignore` に含まれているため、リポジトリにコミットされません
+
+---
+
+### 2. Vercel 環境変数の登録
+
+#### 方法1: CLI で対話式に設定
+
+```bash
+# apps/web ディレクトリで実行
+cd apps/web
+vercel link  # 初回のみ
+
+# 環境変数を追加
+vercel env add OPENAI_API_KEY production
+# プロンプトで値を入力
+
+# 複数環境に追加する場合
+vercel env add OPENAI_API_KEY production preview development
+```
+
+#### 方法2: .env ファイルから一括設定
+
+```bash
+# .env.production ファイルを作成
+cat > .env.production << 'EOF'
+OPENAI_API_KEY=sk-your-production-key
+BASIC_AUTH_USERNAME=your_username
+BASIC_AUTH_PASSWORD=your_secure_password
+EOF
+
+# Vercelへ一括登録
+while IFS='=' read -r key value; do
+  [[ -z "$key" || "$key" =~ ^# ]] && continue
+  echo "$value" | vercel env add "$key" production --yes 2>/dev/null || \
+    echo "⚠️ $key already exists, skipping"
+done < .env.production
+
+# 完了後は .env.production を削除
+rm .env.production
+```
+
+#### 方法3: Vercel Dashboard から設定
+
+1. https://vercel.com にログイン
+2. プロジェクトを選択
+3. **Settings** → **Environment Variables**
+4. **Add New** をクリック
+5. 以下を入力:
+   - **Key**: `OPENAI_API_KEY`
+   - **Value**: `sk-xxxxxxxx...`
+   - **Environment**: Production / Preview / Development を選択
+
+#### Vercel → ローカルへ取得
+
+```bash
+# Vercelに設定済みの環境変数をローカルに取得
+cd apps/web
+vercel env pull .env.local
+```
+
+---
+
+## 他のAIプロバイダー (オプション)
+
+### Anthropic (Claude)
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxx
+```
+
+> 🔗 https://console.anthropic.com/settings/keys
+
+### Google AI (Gemini)
+
+```bash
+GOOGLE_GENERATIVE_AI_API_KEY=xxxxxxxxxxxxx
+```
+
+> 🔗 https://aistudio.google.com/app/apikey
+
+### Azure OpenAI
+
+```bash
+AZURE_OPENAI_API_KEY=xxxxxxxxxxxxx
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+```
+
+---
+
+## 使用例
+
+### サーバーサイド (apps/*/server/)
+
+```typescript
+import { openai, generateText } from '@goui/ai';
+
+// OPENAI_API_KEY は自動的に読み込まれる
+const result = await generateText({
+  model: openai('gpt-4o'),
+  prompt: 'Hello!',
+});
+```
+
+### 別のプロバイダーを使う場合
+
+```bash
+# 1. プロバイダーパッケージを追加
+pnpm --filter @goui/ai add @ai-sdk/anthropic@beta
+
+# 2. packages/ai/src/index.ts でエクスポート
+export { anthropic, createAnthropic } from '@ai-sdk/anthropic';
+```
+
+```typescript
+import { anthropic, generateText } from '@goui/ai';
+
+const result = await generateText({
+  model: anthropic('claude-sonnet-4-20250514'),
+  prompt: 'Hello!',
+});
+```
+
+---
+
+## トラブルシューティング
+
+### "Invalid API Key" エラー
+
+1. APIキーが正しく設定されているか確認:
+   ```bash
+   echo $OPENAI_API_KEY
+   ```
+
+2. .env ファイルがルートにあるか確認:
+   ```bash
+   ls -la .env
+   ```
+
+3. サーバーを再起動
+
+### Vercel で環境変数が反映されない
+
+1. 環境変数が正しい Environment (Production/Preview/Development) に設定されているか確認
+2. 再デプロイが必要な場合がある:
+   ```bash
+   vercel deploy --prod
+   ```
