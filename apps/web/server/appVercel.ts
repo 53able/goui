@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import * as shared from '@goui/shared';
 
 /**
  * Vercel Functions向けのHonoアプリケーション（切り分け用）
@@ -54,6 +55,11 @@ const createApp = () => {
         500,
       );
     }
+  });
+
+  app.get('/api/debug/static', (c) => {
+    const keys = Object.keys(shared as Record<string, unknown>);
+    return c.json({ ok: true, keys });
   });
 
   return app;
