@@ -19,8 +19,8 @@ const createApp = () => {
       '@goui/shared',
       '@hono/zod-openapi',
       'hono/secure-headers',
-      './routes/health',
-      './routes/users/index',
+      './routes/health.js',
+      './routes/users/index.js',
     ] as const;
 
     const isAllowed = (value: string): value is (typeof allowedTargets)[number] =>

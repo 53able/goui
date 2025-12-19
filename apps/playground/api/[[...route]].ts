@@ -4,7 +4,7 @@
  * @note 認証は middleware.ts（Edge Middleware）で適用
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import app from '../server/appVercel';
+import app from '../server/appVercel.js';
 
 type NodeReq = IncomingMessage;
 type NodeRes = ServerResponse<IncomingMessage>;
