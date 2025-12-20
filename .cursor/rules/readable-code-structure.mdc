@@ -1,0 +1,193 @@
+---
+description: コードの構造とロジックを単純化し、理解しやすくするための原則と実践手法
+alwaysApply: false
+---
+
+# 理解しやすいコードの構造とロジック
+
+> **目的**: コードを他の人が最短時間で理解できるようにする
+> **原理**: 人間の認知限界（3-4個の概念）を考慮した設計
+
+## 3つの単純化カテゴリー
+
+| カテゴリー | 目的 | キーワード |
+|-----------|------|-----------|
+| **式の分割** | 巨大な式を飲み込みやすいサイズに | 説明変数、要約変数、ド・モルガン |
+| **制御フロー** | 条件分岐を自然で読みやすく | ガード節、早期リターン、continue |
+| **タスク分離** | 一度に1つのタスクを行う | 関数分割、下位問題の抽出 |
+
+---
+
+## 判断ルール（Quick Reference）
+
+### 式の分割が必要な場合
+
+| 条件 | アクション |
+|------|-----------|
+| 式が3行以上 or 演算子3つ以上 | 説明変数を導入 |
+| 式の一部が独立した「概念」 | 要約変数で概念を命名 |
+| 否定演算子（!）が2つ以上ネスト | ド・モルガンで簡潔化 |
+| 1行に3つ以上の処理 | 段階的に分割（「頭がいい」コード回避） |
+| 条件分岐5つ以上 or ネスト3層以上 | 反対からアプローチ |
+
+### 制御フローの単純化が必要な場合
+
+| 条件 | アクション |
+|------|-----------|
+| ネスト2層以上 | ガード節で早期リターン |
+| ループ内に複数の条件分岐 | continue文でネスト削減 |
+| 否定形の条件が先 | 肯定形・単純な条件を先に |
+| 三項演算子がネスト | if/elseで明確に |
+| 比較式が不自然 | 変化する値を左、安定した値を右 |
+
+### タスク分離が必要な場合
+
+| 条件 | アクション |
+|------|-----------|
+| 関数が10行以上 | タスクごとに関数分割 |
+| 関数内に3つ以上の異なる処理 | 論理的な「段落」に分離 |
+| 責務の説明に「と」「また」が必要 | 単一責務に分割 |
+| 汎用的な処理が混在 | 下位問題として抽出 |
+| 変数のスコープが広い or 再代入あり | スコープを狭める、const化 |
+
+---
+
+## 変換パターン
+
+### パターン1: 説明変数と要約変数
+
+```typescript
+// Before: 巨大な式
+if (user.age >= 18 && user.hasLicense && user.insuranceStatus === 'active') { }
+
+// After: 要約変数で概念を明確化
+const isEligibleToDrive = user.age >= 18 && user.hasLicense && user.insuranceStatus === 'active';
+if (isEligibleToDrive) { }
+```
+
+### パターン2: ガード節で早期リターン
+
+```typescript
+// Before: 深いネスト
+function process(user: User | null): Result {
+  if (user !== null) {
+    if (user.isActive) {
+      return performAction(user);  // メインロジックが深いネストの中
+    }
+  }
+  return { error: 'Invalid' };
+}
+
+// After: ガード節
+function process(user: User | null): Result {
+  if (user === null) return { error: 'User not found' };
+  if (!user.isActive) return { error: 'User inactive' };
+  return performAction(user);  // メインロジックがネストなし
+}
+```
+
+### パターン3: continueでネスト削減
+
+```typescript
+// Before: 深いネスト
+for (const item of items) {
+  if (item.isValid) {
+    if (item.hasData) {
+      processItem(item);
+    }
+  }
+}
+
+// After: continueで早期継続
+for (const item of items) {
+  if (!item.isValid) continue;
+  if (!item.hasData) continue;
+  processItem(item);
+}
+```
+
+### パターン4: 反対からアプローチ
+
+```typescript
+// Before: 複雑な重複判定
+function isOverlapping(r1: Range, r2: Range): boolean {
+  if (r1.start <= r2.start) {
+    if (r1.end >= r2.start) { return true; }
+  }
+  // ... さらに複雑な条件
+}
+
+// After: 重ならない条件を先にチェック
+function isOverlapping(r1: Range, r2: Range): boolean {
+  if (r1.end < r2.start || r2.end < r1.start) return false;
+  return true;
+}
+```
+
+### パターン5: タスク分離
+
+```typescript
+// Before: 複数のタスクが混在
+function processOrder(data: unknown): Result {
+  // 検証 → 整形 → 計算 → 保存が一つの関数に
+  if (!data) throw new Error('Invalid');
+  const order = { id: data.id, total: 0 };
+  order.total = calculateTotal(data.items);
+  database.save(order);
+  return { success: true, order };
+}
+
+// After: タスクごとに分離
+function processOrder(data: unknown): Result {
+  const validated = validateOrderData(data);
+  const order = transformToOrder(validated);
+  const orderWithTotal = calculateTotal(order);
+  return saveOrder(orderWithTotal);
+}
+```
+
+### パターン6: 下位問題の抽出
+
+```typescript
+// Before: 下位問題が混在
+function sendEmail(user: User): void {
+  const name = user.name.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  const date = `${new Date().getFullYear()}-${...}`;  // フォーマット処理
+  emailService.send({ to: user.email, subject: `Welcome, ${name}!` });
+}
+
+// After: 汎用処理を抽出
+function sendEmail(user: User): void {
+  emailService.send({
+    to: user.email,
+    subject: `Welcome, ${formatUserName(user.name)}!`
+  });
+}
+// formatUserName, formatDate は別の汎用関数として抽出
+```
+
+---
+
+## アンチパターン
+
+| パターン | 問題 | 対策 |
+|----------|------|------|
+| 巨大な式をそのまま | 認知負荷が高い | 説明変数・要約変数で分割 |
+| 「頭がいい」コード | 理解に時間がかかる | 段階的に処理を分ける |
+| 深いネスト | 精神的スタックが大きい | 早期リターン・continue |
+| 複数タスクを1関数に | 責務が不明確 | タスクごとに分割 |
+| 下位問題の混在 | 本質が見えにくい | 汎用処理を抽出 |
+| 広いスコープ・再代入 | 追跡が困難 | スコープを狭める、const |
+
+---
+
+## チェックリスト
+
+```
+□ 式が3行以上 or 演算子3つ以上 → 説明変数・要約変数
+□ 否定演算子が2つ以上ネスト → ド・モルガンで簡潔化
+□ ネスト2層以上 → 早期リターン or continue
+□ 関数10行以上 or 3つ以上の処理 → タスク分離
+□ 汎用処理が混在 → 下位問題を抽出
+□ let or 広いスコープ → const + スコープ縮小
+```
