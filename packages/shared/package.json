@@ -5,11 +5,15 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "biome check --write .",
     "lint:check": "biome check ."

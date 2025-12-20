@@ -6,13 +6,15 @@
     "moduleResolution": "bundler",
     "skipLibCheck": true,
     "strict": true,
-    "noEmit": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
   "include": ["src/**/*"]
 }
-
