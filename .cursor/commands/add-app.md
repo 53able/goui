@@ -1389,6 +1389,7 @@ export default async function middleware(request: Request) {
 ```json
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "buildCommand": "cd ../.. && pnpm turbo build --filter=@myorg/${APP_NAME}",
   "installCommand": "cd ../.. && pnpm install",
   "outputDirectory": "dist",

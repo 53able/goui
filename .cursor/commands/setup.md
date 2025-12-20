@@ -354,11 +354,16 @@ Vercel Edge Runtime では以下のモジュールがサポートされません
 
 ### Ignored Build Step（差分ビルド）
 
-Vercel Dashboard → Project Settings → Git → Ignored Build Step:
+各アプリの `vercel.json` に `ignoreCommand` が設定済み。変更がないアプリはビルドがスキップされる：
 
-```bash
-git diff HEAD^ HEAD --quiet ./apps/web ./packages/
+```json
+{
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."
+}
 ```
+
+> 💡 **動作**: 前のコミットと比較して、そのアプリのディレクトリに変更がなければビルドをスキップ。
+> これにより、1ファイル変更で全アプリがビルドされる無駄を防ぐ。
 
 ---
 
