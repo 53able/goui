@@ -1,39 +1,39 @@
 import { next } from '@vercel/edge';
 
 /**
- * Vercel Edge Middleware - API認証のみ（純粋JS版）
- * @description /api/v1/* のみBasic認証を適用
- * @note Honoモジュールは Edge Runtime でサポートされないため純粋JSで実装
+ * Vercel Edge Middleware - Basic認証
+ * @description アプリ全体にBasic認証を適用（静的ファイル含む）
  */
 export const config = {
-  matcher: ['/api/v1/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
 
 /**
- * Basic認証の検証
+ * Basic認証のクレデンシャルを検証
  */
 const verifyCredentials = (authHeader: string | null): boolean => {
   if (!authHeader?.startsWith('Basic ')) {
     return false;
   }
+
   const base64Credentials = authHeader.slice(6);
   const credentials = atob(base64Credentials);
   const [username, password] = credentials.split(':');
 
-  const validUsername = process.env.BASIC_AUTH_USERNAME ?? 'admin';
-  const validPassword = process.env.BASIC_AUTH_PASSWORD ?? 'admin';
+  const expectedUsername = process.env.BASIC_AUTH_USERNAME ?? 'admin';
+  const expectedPassword = process.env.BASIC_AUTH_PASSWORD ?? 'admin';
 
-  return username === validUsername && password === validPassword;
+  return username === expectedUsername && password === expectedPassword;
 };
 
 /**
- * 401 Unauthorized レスポンス
+ * 401 Unauthorized レスポンスを返す
  */
 const unauthorizedResponse = (): Response => {
   return new Response('Unauthorized', {
     status: 401,
     headers: {
-      'WWW-Authenticate': 'Basic realm="Secure Area"',
+      'WWW-Authenticate': 'Basic realm="Breakout Game"',
     },
   });
 };
@@ -42,6 +42,13 @@ const unauthorizedResponse = (): Response => {
  * Vercel Edge Middleware エントリーポイント
  */
 export default async function middleware(request: Request) {
+  const url = new URL(request.url);
+
+  // ヘルスチェックは認証スキップ
+  if (url.pathname === '/health' || url.pathname === '/api/health') {
+    return next();
+  }
+
   // Basic認証チェック
   const authHeader = request.headers.get('Authorization');
   if (!verifyCredentials(authHeader)) {
