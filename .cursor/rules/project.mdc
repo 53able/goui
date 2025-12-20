@@ -313,16 +313,32 @@ import type { User } from '@myorg/shared';
 
 ## 📁 Naming Conventions
 
+### ディレクトリ・パッケージ名（kebab-case）
+
 | 種類 | 規則 | 例 |
 |------|------|-----|
-| **パッケージ名** | `@myorg/*` | `@myorg/web`, `@myorg/ui` |
+| **apps/ ディレクトリ** | `kebab-case` | `apps/life-game`, `apps/admin` |
+| **packages/ ディレクトリ** | `kebab-case` | `packages/shared`, `packages/ui` |
+| **パッケージ名** | `@myorg/kebab-case` | `@myorg/life-game`, `@myorg/ui` |
+
+> 💡 URL親和性・npm規約・OS互換性のため、ディレクトリ名は小文字ケバブケースを使用
+
+### ファイル名
+
+| 種類 | 規則 | 例 |
+|------|------|-----|
 | **コンポーネント** | `PascalCase.tsx` | `UserList.tsx` |
 | **ユーティリティ** | `camelCase.ts` | `formatDate.ts` |
 | **ストア** | `camelCaseStore.ts` | `userStore.ts` |
 | **スキーマ** | `schemas.ts` | `packages/shared/src/schemas.ts` |
 | **テスト** | `*.test.ts` / `*.test.tsx` | `UserList.test.tsx` |
-| **ファイル名** | 最大4単語連結 | `userListTable.tsx` |
-| **Gitブランチ** | 最大4単語連結 | `feature/user-list-table` |
+| **単語数制限** | 最大4単語連結 | `userListTable.tsx` |
+
+### その他
+
+| 種類 | 規則 | 例 |
+|------|------|-----|
+| **Gitブランチ** | `kebab-case` 最大4単語 | `feature/user-list-table` |
 
 ---
 
