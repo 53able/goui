@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  /* ブロック崩しらしいレトロなカラースキーム */
+  --color-background: hsl(230 25% 10%);
+  --color-foreground: hsl(0 0% 98%);
+  --color-muted-foreground: hsl(215 20% 65%);
+  --color-primary: hsl(180 100% 50%);
+  --color-primary-foreground: hsl(230 25% 10%);
+  --color-accent: hsl(320 100% 60%);
+  --color-accent-foreground: hsl(0 0% 98%);
+
+  /* ゲーム用カスタムカラー */
+  --color-paddle: hsl(180 100% 50%);
+  --color-ball: hsl(45 100% 60%);
+  --color-brick-1: hsl(0 80% 55%);
+  --color-brick-2: hsl(30 90% 55%);
+  --color-brick-3: hsl(60 90% 55%);
+  --color-brick-4: hsl(120 70% 50%);
+  --color-brick-5: hsl(180 80% 50%);
+  --color-brick-6: hsl(270 70% 60%);
+}
+
+@media (prefers-color-scheme: light) {
+  @theme {
+    --color-background: hsl(220 15% 95%);
+    --color-foreground: hsl(230 25% 10%);
+    --color-muted-foreground: hsl(215 16% 47%);
+    --color-primary: hsl(180 100% 35%);
+    --color-primary-foreground: hsl(0 0% 100%);
+  }
+}
+
+/* ゲームキャンバス用のスタイル */
+canvas {
+  image-rendering: pixelated;
+}
+
+/* iOS Safe Area対応 */
+.safe-area-inset {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* スマホでのスクロール防止（ゲーム中） */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+/* タッチハイライトを無効化 */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* スムーズなリサイズ */
+canvas {
+  transition: width 0.2s ease-out;
+}
+
+/* ボタンのタッチフィードバック強化 */
+button {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
