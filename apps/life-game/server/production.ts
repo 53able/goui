@@ -84,18 +84,22 @@ const startProductionServer = async () => {
       // SSRでReactコンポーネントをレンダリング
       const appHtml = ssrModule.render(initialData);
 
-      // SSR用プレースホルダーを置換
+      // SSR用のHTML変換
       const html = template
-        .replace(/<!--ssr-title-->.*?<!--\/ssr-title-->/, initialData.title)
+        // titleを置換
+        .replace(/<title>.*?<\/title>/, `<title>${initialData.title}</title>`)
+        // meta descriptionを置換
         .replace(
-          /<!--ssr-description-->.*?<!--\/ssr-description-->/,
-          initialData.description,
+          /<meta name="description" content=".*?".*?\/>/,
+          `<meta name="description" content="${initialData.description}" />`,
         )
+        // headの末尾に初期データを挿入
         .replace(
-          '<!--ssr-head-->',
-          `<script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script>`,
+          '</head>',
+          `<script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script></head>`,
         )
-        .replace('<!--ssr-outlet-->', appHtml);
+        // rootにSSR HTMLを挿入
+        .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
 
       return c.html(html);
     } catch (error) {
