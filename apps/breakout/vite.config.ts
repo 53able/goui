@@ -1,7 +1,22 @@
 import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+/**
+ * SSRプレースホルダーを置換するViteプラグイン
+ * @description ビルド時に <!--ssr-xxx--> プレースホルダーを実際の値に置換
+ */
+const stripSsrPlaceholders = (): Plugin => ({
+  name: 'strip-ssr-placeholders',
+  transformIndexHtml(html) {
+    return html
+      .replace(/<!--ssr-title-->(.*?)<!--\/ssr-title-->/g, '$1')
+      .replace(/<!--ssr-description-->(.*?)<!--\/ssr-description-->/g, '$1')
+      .replace(/<!--ssr-head-->/g, '')
+      .replace(/<!--ssr-outlet-->/g, '');
+  },
+});
 
 /**
  * breakout アプリケーションの Vite 設定
@@ -9,6 +24,7 @@ import { defineConfig } from 'vite';
  */
 export default defineConfig({
   plugins: [
+    stripSsrPlaceholders(),
     react({
       // SSR環境でのFast Refresh preambleエラーを回避
       jsxRuntime: 'automatic',
