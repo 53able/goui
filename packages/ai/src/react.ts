@@ -21,7 +21,7 @@
  *
  * @example
  * ```bash
- * pnpm --filter @goui/web add @ai-sdk/react@beta
+ * pnpm --filter @goui/tetris add @ai-sdk/react@beta
  * ```
  *
  * ```typescript
@@ -32,7 +32,7 @@ export const AI_SDK_REACT_SETUP_INFO = `
 AI SDK React を使う場合:
 
 1. 各アプリで @ai-sdk/react をインストール:
-   pnpm --filter @goui/web add @ai-sdk/react@beta
+   pnpm --filter @goui/tetris add @ai-sdk/react@beta
 
 2. 直接インポートして使用:
    import { useChat, useCompletion } from '@ai-sdk/react';
