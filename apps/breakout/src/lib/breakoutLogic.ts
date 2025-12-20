@@ -190,9 +190,7 @@ export const applyPowerUp = (
   // ボール速度変更
   let newBall = ball;
   if (itemType === 'slowBall') {
-    const currentSpeed = Math.sqrt(
-      ball.velocity.x ** 2 + ball.velocity.y ** 2,
-    );
+    const currentSpeed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
     const targetSpeed = config.ballSpeed * 0.6;
     if (currentSpeed > targetSpeed) {
       const ratio = targetSpeed / currentSpeed;
@@ -205,9 +203,7 @@ export const applyPowerUp = (
       };
     }
   } else if (itemType === 'speedUp') {
-    const currentSpeed = Math.sqrt(
-      ball.velocity.x ** 2 + ball.velocity.y ** 2,
-    );
+    const currentSpeed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
     const targetSpeed = config.ballSpeed * 1.5;
     if (currentSpeed < targetSpeed) {
       const ratio = targetSpeed / currentSpeed;
@@ -258,9 +254,7 @@ const removePowerUpEffect = (
 
   // ボール速度をリセット
   if (itemType === 'slowBall' || itemType === 'speedUp') {
-    const currentSpeed = Math.sqrt(
-      ball.velocity.x ** 2 + ball.velocity.y ** 2,
-    );
+    const currentSpeed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
     const ratio = config.ballSpeed / currentSpeed;
     return {
       ...game,
@@ -498,7 +492,7 @@ const updateBallPhysics = (
   paddle: Paddle,
   config: GameConfig,
 ): { ball: Ball; fellDown: boolean } => {
-  let newBall = { ...ball };
+  const newBall = { ...ball };
   let fellDown = false;
 
   // ボールを移動
@@ -559,7 +553,7 @@ const updateBallBrickCollisions = (
   destroyedPositions: { x: number; y: number }[];
   scoreGained: number;
 } => {
-  let newBall = { ...ball };
+  const newBall = { ...ball };
   let newBricks = [...bricks];
   const destroyedPositions: { x: number; y: number }[] = [];
   let scoreGained = 0;
@@ -783,7 +777,7 @@ export const advanceToNextLevel = (game: BreakoutGame): BreakoutGame => {
   const speedMultiplier = getSpeedMultiplier(nextLevel);
   const newConfig = {
     ...config,
-    ballSpeed: config.ballSpeed * speedMultiplier / getSpeedMultiplier(level),
+    ballSpeed: (config.ballSpeed * speedMultiplier) / getSpeedMultiplier(level),
   };
 
   return {
