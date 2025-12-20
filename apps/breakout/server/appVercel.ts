@@ -1,9 +1,9 @@
-import * as shared from '@goui/shared';
 import { Hono } from 'hono';
 
 /**
  * Vercel Functions向けのHonoアプリケーション（軽量版）
  * @description Edge Runtime の制約により、最小限の実装
+ * @note @goui/shared はbreakoutプロジェクトのVercel Functionsでは動作しないため除外
  * @see https://hono.dev/docs/getting-started/vercel
  */
 const createApp = () => {
@@ -21,12 +21,6 @@ const createApp = () => {
       environment: process.env.VERCEL_ENV ?? 'unknown',
     }),
   );
-
-  // デバッグ用: 静的インポート確認
-  app.get('/api/debug/static', (c) => {
-    const keys = Object.keys(shared as Record<string, unknown>);
-    return c.json({ ok: true, keys });
-  });
 
   return app;
 };
