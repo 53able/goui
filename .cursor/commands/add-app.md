@@ -109,8 +109,36 @@ flowchart TD
     C -->|使用中| C1[エラー: Viteポート競合]
     D -->|未使用| E{ディレクトリ 存在確認}
     D -->|使用中| D1[エラー: APIポート競合]
-    E -->|なし| F[Phase 2へ]
+    E -->|なし| F{packages/shared ビルド確認}
     E -->|あり| E1[エラー: 既存アプリ]
+    F -->|OK| G[Phase 2へ]
+    F -->|NG| F1[エラー: shared未ビルド]
+```
+
+#### Step 1.0: packages/shared のビルド確認（重要）
+
+> ⚠️ **Vercel Functions で `@myorg/shared` を使用する場合、ビルド済みJavaScriptが必要です！**
+
+```bash
+# packages/shared が正しくビルドされているか確認
+ls packages/shared/dist/
+# → index.js, index.d.ts が存在すること
+
+# ビルドされていない場合は実行
+pnpm --filter @myorg/shared build
+```
+
+**正しい設定の確認:**
+
+```bash
+# package.json の exports を確認
+cat packages/shared/package.json | grep -A3 '"exports"'
+# → "default": "./dist/index.js" であること（./src/index.ts は ❌）
+
+# tsconfig.json を確認
+cat packages/shared/tsconfig.json | grep -E "(noEmit|outDir)"
+# → "noEmit": true がないこと
+# → "outDir": "./dist" があること
 ```
 
 #### Step 1.1: アプリ名のバリデーション
@@ -1111,7 +1139,10 @@ serve({
 
 #### Step 2.14: server/appVercel.ts 生成（Vercel Serverless用）
 
-> 💡 Vercel Serverless Functions で使用する軽量版Honoアプリ。Edge Runtimeの制約により、`@hono/zod-openapi` などは使用しない。
+> 💡 Vercel Node.js Serverless Functions で使用する軽量版Honoアプリ。
+> 
+> ⚠️ **重要**: `@myorg/shared` を使用するには、**ビルド済みJavaScriptが必要**です。
+> `packages/shared` の `exports` が `./dist/index.js` を指していることを確認してください。
 
 ```typescript
 import { Hono } from 'hono';
@@ -1119,7 +1150,8 @@ import * as shared from '@myorg/shared';
 
 /**
  * Vercel Functions向けのHonoアプリケーション（軽量版）
- * @description Edge Runtime の制約により、最小限の実装
+ * @description Node.js Serverless Functions として動作
+ * @note @hono/zod-openapi や @scalar/hono-api-reference は重いため使用しない
  * @see https://hono.dev/docs/getting-started/vercel
  */
 const createApp = () => {
@@ -1129,52 +1161,16 @@ const createApp = () => {
   app.get('/health', (c) => c.json({ status: 'ok' }));
   app.get('/api/health', (c) => c.json({ status: 'ok' }));
 
-  // デバッグ用: 依存関係のimport確認
-  app.get('/api/debug/import', async (c) => {
-    const url = new URL(c.req.url);
-    const target = url.searchParams.get('target');
+  // API情報
+  app.get('/api/info', (c) =>
+    c.json({
+      name: '${APP_NAME} API',
+      version: '1.0.0',
+      environment: process.env.VERCEL_ENV ?? 'unknown',
+    }),
+  );
 
-    const allowedTargets = [
-      '@myorg/shared',
-      '@hono/zod-openapi',
-      'hono/secure-headers',
-      './routes/health.js',
-    ] as const;
-
-    const isAllowed = (value: string): value is (typeof allowedTargets)[number] =>
-      (allowedTargets as readonly string[]).includes(value);
-
-    if (!target || !isAllowed(target)) {
-      return c.json(
-        {
-          ok: false,
-          error: 'invalid_target',
-          allowedTargets,
-        },
-        400,
-      );
-    }
-
-    try {
-      const imported = await import(target);
-      const keys = Object.keys(imported as Record<string, unknown>);
-      return c.json({ ok: true, target, keys });
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown error');
-      return c.json(
-        {
-          ok: false,
-          target,
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        },
-        500,
-      );
-    }
-  });
-
-  // デバッグ用: 静的インポート確認
+  // デバッグ用: 静的インポート確認（packages/shared のビルド確認用）
   app.get('/api/debug/static', (c) => {
     const keys = Object.keys(shared as Record<string, unknown>);
     return c.json({ ok: true, keys });
@@ -1248,21 +1244,107 @@ export { healthRoutes as apiRoutes };
 
 #### Step 2.16: api/[[...route]].ts 生成
 
-> 💡 Hono公式ドキュメント推奨のシンプルな形式。`server/appVercel.ts` をインポートしてエクスポートするだけ。
+> 💡 **Node.js Serverless Functions スタイル**で実装。`req/res` を Web標準の `Request` にブリッジしてHonoに渡す。
+> 
+> ⚠️ シンプルな `export default app` だとEdge Functions扱いになる場合があるため、明示的にNode.jsスタイルで実装。
 
 ```typescript
 /**
  * Vercel Functions エントリポイント
- * @description Hono公式推奨のゼロコンフィグデプロイ
- * @see https://hono.dev/docs/getting-started/vercel
+ * @description Node.js Serverless Functions (req,res) を Hono (fetch) にブリッジする
  * @note 認証は middleware.ts（Edge Middleware）で適用
  */
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import app from '../server/appVercel.js';
 
-export default app;
+type NodeReq = IncomingMessage;
+type NodeRes = ServerResponse<IncomingMessage>;
+
+const toUrl = (req: NodeReq) => {
+  const protoHeader = req.headers['x-forwarded-proto'];
+  const proto = Array.isArray(protoHeader)
+    ? protoHeader[0]
+    : (protoHeader ?? 'https');
+
+  const hostHeader = req.headers['x-forwarded-host'] ?? req.headers.host;
+  const host = Array.isArray(hostHeader)
+    ? hostHeader[0]
+    : (hostHeader ?? 'localhost');
+
+  const path = req.url ?? '/';
+  return new URL(path, `${proto}://${host}`);
+};
+
+const toHeaders = (req: NodeReq) => {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (typeof value === 'string') {
+      headers.set(key, value);
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        headers.append(key, v);
+      }
+    }
+  }
+  return headers;
+};
+
+const readBody = async (req: NodeReq) => {
+  const method = req.method ?? 'GET';
+  if (method === 'GET' || method === 'HEAD') {
+    return undefined;
+  }
+
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of req) {
+    const buf =
+      typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk);
+    chunks.push(buf);
+  }
+  const body = Buffer.concat(chunks);
+  return body.length > 0 ? body : undefined;
+};
+
+export default async (req: NodeReq, res: NodeRes) => {
+  try {
+    const url = toUrl(req);
+    const headers = toHeaders(req);
+    const body = await readBody(req);
+
+    const request = new Request(url, {
+      method: req.method,
+      headers,
+      body,
+    });
+
+    const response = await app.fetch(request);
+    res.statusCode = response.status;
+
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+
+    const arrayBuffer = await response.arrayBuffer();
+    res.end(Buffer.from(arrayBuffer));
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Unknown error');
+    res.statusCode = 500;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(
+      JSON.stringify({
+        ok: false,
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      }),
+    );
+  }
+};
 ```
 
-> ⚠️ **重要**: Vercel Edge Runtime では `@myorg/shared` の一部や `@hono/zod-openapi`、`@scalar/hono-api-reference` がサポートされないため、`appVercel.ts` は最小限の実装になっています。
+> 📝 **なぜNode.jsスタイル？**: `@myorg/shared` などのワークスペースパッケージを使用する場合、Node.js Serverless Functionsとして動作させる必要があります。
 
 #### Step 2.17: middleware.ts 生成（Vercel Edge Middleware）
 
@@ -1530,6 +1612,42 @@ pnpm --filter @myorg/${APP_NAME} dev:api
 # 2. Vite の proxy 設定を確認
 # vite.config.ts の server.proxy.'/api'.target が正しいポートを指しているか
 ```
+
+### エラー: Vercel Functions で FUNCTION_INVOCATION_FAILED
+
+**原因**: `@myorg/shared` などのワークスペースパッケージがビルドされていない
+
+```bash
+# 1. packages/shared のビルド状態を確認
+ls packages/shared/dist/
+# → index.js, index.d.ts が存在すること
+
+# 2. package.json の exports を確認
+cat packages/shared/package.json | grep -A3 '"exports"'
+# ❌ BAD: "./src/index.ts"
+# ✅ GOOD: "./dist/index.js"
+
+# 3. tsconfig.json を確認
+cat packages/shared/tsconfig.json | grep "noEmit"
+# → "noEmit": true があれば削除
+
+# 4. ビルドスクリプトを追加して実行
+pnpm --filter @myorg/shared build
+```
+
+### エラー: Vercel で認証が効かない（Deployment Protection）
+
+**原因**: Vercel のデフォルト Deployment Protection（SSO）が有効
+
+```bash
+# Vercel API で Deployment Protection を無効化
+curl -X PATCH "https://api.vercel.com/v9/projects/{projectId}?teamId={teamId}" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"ssoProtection": null}'
+```
+
+または、Vercel Dashboard → Project Settings → Deployment Protection で無効化。
 
 ---
 

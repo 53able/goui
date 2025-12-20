@@ -595,11 +595,14 @@ startProductionServer();
 
 ### Vercelデプロイ対応
 
-- [ ] `api/[[...route]].ts`でHonoアプリをエクスポート
-- [ ] `server/appVercel.ts`で軽量版Honoアプリを実装
-- [ ] `middleware.ts`でEdge Middleware認証を実装
+- [ ] `packages/shared` がビルド済みであることを確認（`dist/index.js` が存在）
+- [ ] `api/[[...route]].ts`でNode.js Serverless Functionsスタイルで実装
+- [ ] `server/appVercel.ts`で軽量版Honoアプリを実装（`@myorg/shared` OK）
+- [ ] `middleware.ts`でEdge Middleware認証を実装（`full-app` or `api-only`）
 - [ ] `vercel.json`でビルド設定を定義
+- [ ] Vercel環境変数に`BASIC_AUTH_USERNAME`/`BASIC_AUTH_PASSWORD`を設定
 - [ ] CSRビルドが正常に通ることを確認（`pnpm build`）
+- [ ] Deployment Protection（SSO）を無効化（必要に応じて）
 
 ---
 
@@ -607,13 +610,13 @@ startProductionServer();
 
 ```bash
 # 開発サーバー起動（SSR + HMR）
-pnpm --filter @goui/{app-name} dev:api
+pnpm --filter @myorg/{app-name} dev:api
 
 # 本番ビルド（クライアント + SSRバンドル）
-pnpm --filter @goui/{app-name} build
+pnpm --filter @myorg/{app-name} build
 
 # 本番サーバー起動（SSR対応）
-pnpm --filter @goui/{app-name} start
+pnpm --filter @myorg/{app-name} start
 
 # Vercelローカルプレビュー
 vercel dev --cwd apps/{app-name}
@@ -646,35 +649,72 @@ apps/{app-name}/
 
 ### api/[[...route]].ts の実装
 
-Hono公式ドキュメント推奨のシンプルな形式：
+> ⚠️ **Node.js Serverless Functions スタイル**で実装。`@myorg/shared` などのワークスペースパッケージを使用する場合に必要。
 
 ```typescript
+/**
+ * Vercel Functions エントリポイント
+ * @description Node.js Serverless Functions (req,res) を Hono (fetch) にブリッジする
+ */
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import app from '../server/appVercel.js';
 
-export default app;  // これだけでOK！
+type NodeReq = IncomingMessage;
+type NodeRes = ServerResponse<IncomingMessage>;
+
+const toUrl = (req: NodeReq) => {
+  const proto = req.headers['x-forwarded-proto'] ?? 'https';
+  const host = req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost';
+  return new URL(req.url ?? '/', `${proto}://${host}`);
+};
+
+// ... ヘッダー変換、ボディ読み込みのヘルパー関数 ...
+
+export default async (req: NodeReq, res: NodeRes) => {
+  const request = new Request(toUrl(req), {
+    method: req.method,
+    headers: toHeaders(req),
+    body: await readBody(req),
+  });
+
+  const response = await app.fetch(request);
+  res.statusCode = response.status;
+  response.headers.forEach((v, k) => res.setHeader(k, v));
+  res.end(Buffer.from(await response.arrayBuffer()));
+};
 ```
 
 > 📝 **参考**: [Hono - Vercel](https://hono.dev/docs/getting-started/vercel)
+> 
+> 💡 シンプルな `export default app` だとEdge Functions扱いになる場合があります。
 
 ### server/appVercel.ts の役割
 
-Vercel Serverless Functions用の軽量Honoアプリ：
+Vercel Node.js Serverless Functions用の軽量Honoアプリ：
 
 ```typescript
-import { OpenAPIHono } from '@hono/zod-openapi';
+import { Hono } from 'hono';
+import * as shared from '@myorg/shared';  // ✅ ビルド済みなら使用可能
 
-const app = new OpenAPIHono();
+const app = new Hono();
 
 // ヘルスチェック
 app.get('/health', (c) => c.json({ status: 'ok' }));
+app.get('/api/health', (c) => c.json({ status: 'ok' }));
 
-// APIルート
-app.route('/api', apiRoutes);
+// デバッグ用（packages/shared のビルド確認）
+app.get('/api/debug/static', (c) => {
+  const keys = Object.keys(shared as Record<string, unknown>);
+  return c.json({ ok: true, keys });
+});
 
 export default app;
 ```
 
-**注意**: `@hono/zod-openapi`、`@scalar/hono-api-reference` などはEdge Runtimeで動作しないため、Vercel用アプリでは使用を避けるか、インライン実装にする。
+**⚠️ 重要な注意点**:
+- `@myorg/shared` を使用するには **ビルド済みJavaScriptが必要**（`packages/shared/dist/index.js`）
+- `packages/shared/package.json` の `exports` が `./dist/index.js` を指していること
+- `@hono/zod-openapi`、`@scalar/hono-api-reference` は重いため使用しない
 
 ### middleware.ts の役割
 

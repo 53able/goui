@@ -276,6 +276,19 @@ vercel deploy
 
 ### 環境変数の設定
 
+#### 🔐 Basic認証の設定（必須）
+
+> ⚠️ **セキュリティ注意**: デフォルト値 `admin/admin` は開発用です。本番環境では必ず変更してください！
+
+```bash
+# Basic認証の環境変数を設定
+vercel env add BASIC_AUTH_USERNAME production
+# → 入力: your_secure_username
+
+vercel env add BASIC_AUTH_PASSWORD production
+# → 入力: your_secure_password
+```
+
 #### 環境変数の一括設定（.env から Vercel へ）
 
 ```bash
@@ -300,6 +313,20 @@ done < .env.production
 # Vercelに設定済みの環境変数をローカルに取得
 vercel env pull .env.local
 ```
+
+### 🛡️ Vercel Deployment Protection の無効化
+
+Vercelのデフォルト設定でDeployment Protection（SSO認証）が有効になっている場合、APIアクセスがブロックされます：
+
+```bash
+# Deployment Protection を無効化（APIでの設定が必要）
+curl -X PATCH "https://api.vercel.com/v9/projects/{projectId}?teamId={teamId}" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"ssoProtection": null}'
+```
+
+または、Vercel Dashboard → Project Settings → Deployment Protection で無効化。
 
 ### Vercel Dashboard設定
 
@@ -336,21 +363,59 @@ vercel env pull .env.local
 | `regions` | `hnd1` = 東京リージョン |
 | `rewrites` | SPA対応 + Edge Functions へのルーティング |
 
-### ⚠️ Vercel Edge Runtime の制約
+### ⚠️ Vercel Functions での注意点
 
-Vercel Edge Runtime では以下のモジュールがサポートされません：
-- `@myorg/shared` などのワークスペースパッケージ
-- `@hono/zod-openapi`
-- `@scalar/hono-api-reference`
+Vercel Functionsで共有パッケージを使用する場合、**ビルド済みJavaScriptが必要**です：
 
-そのため、Vercel用のファイルは以下のように実装します：
+#### ✅ 正しい設定（packages/shared）
+
+```json
+// packages/shared/package.json
+{
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}
+```
+
+```json
+// packages/shared/tsconfig.json
+{
+  "compilerOptions": {
+    "outDir": "./dist",
+    "declaration": true
+    // ❌ "noEmit": true は削除
+  }
+}
+```
+
+#### ❌ 間違った設定
+
+```json
+// ❌ TypeScriptソースを直接参照 → Vercel Functionsで動かない
+{
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
+```
+
+#### Vercel用ファイルの実装
 
 | ファイル | 実装方法 |
 |---------|---------|
-| `api/[[...route]].ts` | シンプルなインラインHonoアプリ（Edge Runtime） |
-| `middleware.ts` | 純粋なJavaScriptで Basic認証を実装 |
+| `api/[[...route]].ts` | Node.js Serverless Functionsスタイル（req/res → Honoブリッジ） |
+| `server/appVercel.ts` | 軽量版Honoアプリ（`@myorg/shared` OK） |
+| `middleware.ts` | Vercel Edge Middleware（純粋JS、Basic認証） |
 
-> 📝 ローカル開発では `server/app.ts` の完全版API（OpenAPI/Swagger UI付き）を使用します。
+> 📝 `@hono/zod-openapi` や `@scalar/hono-api-reference` は重いため、`appVercel.ts` では使用しない。
+> ローカル開発では `server/app.ts` の完全版API（OpenAPI/Swagger UI付き）を使用します。
 
 ### Ignored Build Step（差分ビルド）
 

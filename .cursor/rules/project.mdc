@@ -251,6 +251,9 @@ import { Button } from '@myorg/ui';
 
 ### Pattern 1: Zodスキーマファースト（packages/shared）
 
+> ⚠️ **重要**: `packages/shared` はVercel Functionsで使用するため、**ビルド済みJavaScriptが必要**です。
+> `tsconfig.json` で `noEmit: true` を設定しないでください。
+
 ```typescript
 // packages/shared/src/schemas.ts
 import { z } from 'zod';
@@ -271,6 +274,34 @@ export const CreateUserSchema = UserSchema.omit({
   createdAt: true 
 });
 export type CreateUser = z.infer<typeof CreateUserSchema>;
+```
+
+#### packages/shared の必須設定
+
+```json
+// packages/shared/package.json
+{
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}
+```
+
+```json
+// packages/shared/tsconfig.json
+{
+  "compilerOptions": {
+    "outDir": "./dist",
+    "declaration": true
+    // ❌ "noEmit": true は禁止
+  }
+}
 ```
 
 ### Pattern 2: 共有UIコンポーネント（packages/ui）

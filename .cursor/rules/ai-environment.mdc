@@ -6,7 +6,7 @@ alwaysApply: false
 
 # AI API 環境変数設定ガイド
 
-> @goui/ai パッケージで使用する AI プロバイダーの環境変数設定
+> @myorg/ai パッケージで使用する AI プロバイダーの環境変数設定
 
 ---
 
@@ -29,7 +29,7 @@ OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 プロジェクトルートに `.env` ファイルを作成:
 
 ```bash
-# goui/ (プロジェクトルート)
+# project-root/ (プロジェクトルート)
 touch .env
 echo "OPENAI_API_KEY=sk-your-key-here" >> .env
 ```
@@ -140,7 +140,7 @@ AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 ### サーバーサイド (apps/*/server/)
 
 ```typescript
-import { openai, generateText } from '@goui/ai';
+import { openai, generateText } from '@myorg/ai';
 
 // OPENAI_API_KEY は自動的に読み込まれる
 const result = await generateText({
@@ -153,14 +153,14 @@ const result = await generateText({
 
 ```bash
 # 1. プロバイダーパッケージを追加
-pnpm --filter @goui/ai add @ai-sdk/anthropic@beta
+pnpm --filter @myorg/ai add @ai-sdk/anthropic@beta
 
 # 2. packages/ai/src/index.ts でエクスポート
 export { anthropic, createAnthropic } from '@ai-sdk/anthropic';
 ```
 
 ```typescript
-import { anthropic, generateText } from '@goui/ai';
+import { anthropic, generateText } from '@myorg/ai';
 
 const result = await generateText({
   model: anthropic('claude-sonnet-4-20250514'),
