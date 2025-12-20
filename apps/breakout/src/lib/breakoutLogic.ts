@@ -4,7 +4,10 @@ import type {
   Brick,
   GameConfig,
   GameState,
+  Item,
+  ItemType,
   Paddle,
+  PowerUp,
 } from '@/schemas/breakout';
 
 /**
@@ -18,6 +21,301 @@ const BRICK_COLORS = [
   'hsl(180, 80%, 50%)', // シアン
   'hsl(270, 70%, 60%)', // 紫
 ];
+
+/**
+ * アイテムの出現確率（％）
+ */
+const ITEM_DROP_CHANCE = 15;
+
+/**
+ * アイテム種類と重み付け
+ * @description 重みが高いほど出やすい
+ */
+const ITEM_WEIGHTS: { type: ItemType; weight: number }[] = [
+  { type: 'expandPaddle', weight: 20 }, // 🔲 パドル拡張
+  { type: 'shrinkPaddle', weight: 12 }, // 🔹 パドル縮小（デバフ）
+  { type: 'piercingBall', weight: 12 }, // 🔥 貫通ボール
+  { type: 'slowBall', weight: 15 }, // 🐢 スローボール
+  { type: 'extraLife', weight: 8 }, // 💖 ライフ+1
+  { type: 'speedUp', weight: 12 }, // ⚡ スピードアップ
+  { type: 'multiBall', weight: 18 }, // 🎱 マルチボール
+];
+
+/**
+ * パワーアップの持続時間（フレーム数）
+ * @description 60fps換算: 300 = 5秒, 600 = 10秒
+ */
+const POWERUP_DURATIONS: Record<ItemType, number> = {
+  expandPaddle: 600, // 10秒
+  shrinkPaddle: 300, // 5秒
+  piercingBall: 480, // 8秒
+  slowBall: 360, // 6秒
+  extraLife: 0, // 即時効果
+  speedUp: 480, // 8秒
+  multiBall: 0, // 即時効果（ボール追加）
+};
+
+/**
+ * 重み付きランダムでアイテムタイプを選択
+ * @returns 選ばれたアイテムタイプ
+ */
+const pickRandomItemType = (): ItemType => {
+  const totalWeight = ITEM_WEIGHTS.reduce((sum, i) => sum + i.weight, 0);
+  const random = Math.random() * totalWeight;
+
+  let cumulative = 0;
+  for (const item of ITEM_WEIGHTS) {
+    cumulative += item.weight;
+    if (random < cumulative) {
+      return item.type;
+    }
+  }
+  return 'expandPaddle'; // フォールバック
+};
+
+/**
+ * アイテムを生成（ブロック破壊時）
+ * @param x - X座標
+ * @param y - Y座標
+ * @returns 生成されたアイテム or null
+ */
+export const maybeSpawnItem = (x: number, y: number): Item | null => {
+  if (Math.random() * 100 > ITEM_DROP_CHANCE) {
+    return null;
+  }
+
+  return {
+    id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    x,
+    y,
+    type: pickRandomItemType(),
+    speed: 2,
+    size: 12,
+  };
+};
+
+/**
+ * アイテムとパドルの衝突判定
+ * @param item - アイテム
+ * @param paddle - パドル
+ * @returns 衝突しているか
+ */
+const checkItemPaddleCollision = (item: Item, paddle: Paddle): boolean => {
+  return (
+    item.x + item.size > paddle.x &&
+    item.x - item.size < paddle.x + paddle.width &&
+    item.y + item.size > paddle.y &&
+    item.y - item.size < paddle.y + paddle.height
+  );
+};
+
+/**
+ * パワーアップ効果を適用
+ * @param game - 現在のゲーム状態
+ * @param itemType - アイテムの種類
+ * @returns 更新されたゲーム状態
+ */
+export const applyPowerUp = (
+  game: BreakoutGame,
+  itemType: ItemType,
+): BreakoutGame => {
+  const { paddle, ball, extraBalls, powerUps, config } = game;
+  const duration = POWERUP_DURATIONS[itemType];
+
+  // 即時効果: ライフ+1
+  if (itemType === 'extraLife') {
+    return {
+      ...game,
+      lives: game.lives + 1,
+    };
+  }
+
+  // 即時効果: マルチボール（+5個）
+  if (itemType === 'multiBall') {
+    // 現在のボール速度
+    const speed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
+    const baseAngle = Math.atan2(ball.velocity.y, ball.velocity.x);
+
+    // 扇状に5つのボールを追加（-60度〜+60度）
+    const newBalls: Ball[] = [];
+    for (let i = 0; i < 5; i++) {
+      const angleOffset = ((i - 2) * Math.PI) / 6; // -60, -30, 0, +30, +60度
+      newBalls.push({
+        x: ball.x,
+        y: ball.y,
+        radius: ball.radius,
+        velocity: {
+          x: Math.cos(baseAngle + angleOffset) * speed,
+          y: Math.sin(baseAngle + angleOffset) * speed,
+        },
+      });
+    }
+
+    return {
+      ...game,
+      extraBalls: [...extraBalls, ...newBalls],
+    };
+  }
+
+  // 既存の同種パワーアップを更新（時間リセット）
+  const existingIdx = powerUps.findIndex((p) => p.type === itemType);
+  const newPowerUp: PowerUp = {
+    type: itemType,
+    remainingTime: duration,
+    maxTime: duration,
+  };
+
+  const newPowerUps =
+    existingIdx >= 0
+      ? powerUps.map((p, i) => (i === existingIdx ? newPowerUp : p))
+      : [...powerUps, newPowerUp];
+
+  // パドルサイズ変更
+  let newPaddle = paddle;
+  if (itemType === 'expandPaddle') {
+    const newWidth = Math.min(config.paddleWidth * 1.5, 200);
+    newPaddle = {
+      ...paddle,
+      width: newWidth,
+      x: Math.max(0, Math.min(config.canvasWidth - newWidth, paddle.x)),
+    };
+  } else if (itemType === 'shrinkPaddle') {
+    const newWidth = Math.max(config.paddleWidth * 0.7, 50);
+    newPaddle = {
+      ...paddle,
+      width: newWidth,
+    };
+  }
+
+  // ボール速度変更
+  let newBall = ball;
+  if (itemType === 'slowBall') {
+    const currentSpeed = Math.sqrt(
+      ball.velocity.x ** 2 + ball.velocity.y ** 2,
+    );
+    const targetSpeed = config.ballSpeed * 0.6;
+    if (currentSpeed > targetSpeed) {
+      const ratio = targetSpeed / currentSpeed;
+      newBall = {
+        ...ball,
+        velocity: {
+          x: ball.velocity.x * ratio,
+          y: ball.velocity.y * ratio,
+        },
+      };
+    }
+  } else if (itemType === 'speedUp') {
+    const currentSpeed = Math.sqrt(
+      ball.velocity.x ** 2 + ball.velocity.y ** 2,
+    );
+    const targetSpeed = config.ballSpeed * 1.5;
+    if (currentSpeed < targetSpeed) {
+      const ratio = targetSpeed / currentSpeed;
+      newBall = {
+        ...ball,
+        velocity: {
+          x: ball.velocity.x * ratio,
+          y: ball.velocity.y * ratio,
+        },
+      };
+    }
+  }
+
+  return {
+    ...game,
+    paddle: newPaddle,
+    ball: newBall,
+    powerUps: newPowerUps,
+  };
+};
+
+/**
+ * パワーアップ効果を解除
+ * @param game - 現在のゲーム状態
+ * @param itemType - アイテムの種類
+ * @returns 更新されたゲーム状態
+ */
+const removePowerUpEffect = (
+  game: BreakoutGame,
+  itemType: ItemType,
+): BreakoutGame => {
+  const { paddle, ball, config } = game;
+
+  // パドルサイズをリセット
+  if (itemType === 'expandPaddle' || itemType === 'shrinkPaddle') {
+    return {
+      ...game,
+      paddle: {
+        ...paddle,
+        width: config.paddleWidth,
+        x: Math.max(
+          0,
+          Math.min(config.canvasWidth - config.paddleWidth, paddle.x),
+        ),
+      },
+    };
+  }
+
+  // ボール速度をリセット
+  if (itemType === 'slowBall' || itemType === 'speedUp') {
+    const currentSpeed = Math.sqrt(
+      ball.velocity.x ** 2 + ball.velocity.y ** 2,
+    );
+    const ratio = config.ballSpeed / currentSpeed;
+    return {
+      ...game,
+      ball: {
+        ...ball,
+        velocity: {
+          x: ball.velocity.x * ratio,
+          y: ball.velocity.y * ratio,
+        },
+      },
+    };
+  }
+
+  return game;
+};
+
+/**
+ * パワーアップのタイマーを更新
+ * @param game - 現在のゲーム状態
+ * @returns 更新されたゲーム状態
+ */
+const updatePowerUps = (game: BreakoutGame): BreakoutGame => {
+  const { powerUps } = game;
+  let updatedGame = game;
+
+  // 期限切れパワーアップを処理
+  const expiredTypes: ItemType[] = [];
+  const activePowerUps = powerUps.reduce<PowerUp[]>((acc, pu) => {
+    const newRemainingTime = pu.remainingTime - 1;
+    if (newRemainingTime <= 0) {
+      expiredTypes.push(pu.type);
+      return acc;
+    }
+    return [...acc, { ...pu, remainingTime: newRemainingTime }];
+  }, []);
+
+  // 期限切れ効果を解除
+  for (const type of expiredTypes) {
+    updatedGame = removePowerUpEffect(updatedGame, type);
+  }
+
+  return {
+    ...updatedGame,
+    powerUps: activePowerUps,
+  };
+};
+
+/**
+ * 貫通ボールが有効かチェック
+ * @param powerUps - アクティブなパワーアップ
+ * @returns 貫通ボールが有効か
+ */
+export const hasPiercingBall = (powerUps: PowerUp[]): boolean => {
+  return powerUps.some((p) => p.type === 'piercingBall');
+};
 
 /**
  * パドルを初期化
@@ -86,7 +384,10 @@ export const createGame = (config: GameConfig): BreakoutGame => {
   return {
     paddle,
     ball,
+    extraBalls: [],
     bricks,
+    items: [],
+    powerUps: [],
     score: 0,
     lives: config.lives,
     level: 1,
@@ -189,21 +490,16 @@ const checkBrickCollision = (ball: Ball, brick: Brick): boolean => {
 };
 
 /**
- * ゲームを1フレーム更新
- * @param game - 現在のゲーム状態
- * @returns 新しいゲーム状態
+ * ボールの壁・パドル衝突を処理（位置と速度を更新）
+ * @returns 更新後のボールと落下フラグ
  */
-export const updateGame = (game: BreakoutGame): BreakoutGame => {
-  if (game.state !== 'playing') {
-    return game;
-  }
-
-  const { ball, paddle, bricks, config } = game;
+const updateBallPhysics = (
+  ball: Ball,
+  paddle: Paddle,
+  config: GameConfig,
+): { ball: Ball; fellDown: boolean } => {
   let newBall = { ...ball };
-  let newBricks = [...bricks];
-  let newScore = game.score;
-  let newLives = game.lives;
-  let newState: GameState = game.state;
+  let fellDown = false;
 
   // ボールを移動
   newBall.x += newBall.velocity.x;
@@ -227,23 +523,15 @@ export const updateGame = (game: BreakoutGame): BreakoutGame => {
     newBall.velocity = { ...newBall.velocity, y: Math.abs(newBall.velocity.y) };
   }
 
-  // 下に落ちた（ライフ減少）
+  // 下に落ちた
   if (newBall.y + newBall.radius >= config.canvasHeight) {
-    newLives--;
-    if (newLives <= 0) {
-      newState = 'gameOver';
-    } else {
-      // ボールをリセット
-      newBall = createBall(config, paddle);
-      newState = 'ready';
-    }
+    fellDown = true;
   }
 
   // パドルとの衝突
-  if (checkPaddleCollision(newBall, paddle)) {
-    // パドルのどの位置に当たったかで反射角度を変える
+  if (!fellDown && checkPaddleCollision(newBall, paddle)) {
     const hitPos = (newBall.x - paddle.x) / paddle.width;
-    const angle = (hitPos - 0.5) * (Math.PI / 3); // -60度〜60度
+    const angle = (hitPos - 0.5) * (Math.PI / 3);
     const speed = Math.sqrt(newBall.velocity.x ** 2 + newBall.velocity.y ** 2);
 
     newBall.y = paddle.y - newBall.radius;
@@ -253,51 +541,197 @@ export const updateGame = (game: BreakoutGame): BreakoutGame => {
     };
   }
 
-  // ブロックとの衝突
+  return { ball: newBall, fellDown };
+};
+
+/**
+ * ボールとブロックの衝突を処理
+ * @returns 更新後のボール、ブロック、破壊位置
+ */
+const updateBallBrickCollisions = (
+  ball: Ball,
+  bricks: Brick[],
+  isPiercing: boolean,
+  config: GameConfig,
+): {
+  ball: Ball;
+  bricks: Brick[];
+  destroyedPositions: { x: number; y: number }[];
+  scoreGained: number;
+} => {
+  let newBall = { ...ball };
+  let newBricks = [...bricks];
+  const destroyedPositions: { x: number; y: number }[] = [];
+  let scoreGained = 0;
+
   for (let i = 0; i < newBricks.length; i++) {
     const brick = newBricks[i];
     if (checkBrickCollision(newBall, brick)) {
-      // ブロックを破壊
       newBricks = newBricks.map((b, idx) =>
         idx === i ? { ...b, destroyed: true } : b,
       );
 
-      // スコア加算（上の行ほど高得点）
-      newScore += (config.brickRows - brick.row) * 10;
+      scoreGained += (config.brickRows - brick.row) * 10;
+      destroyedPositions.push({
+        x: brick.x + brick.width / 2,
+        y: brick.y + brick.height / 2,
+      });
 
-      // 反射方向を決定（より正確な衝突判定）
-      const overlapLeft = newBall.x + newBall.radius - brick.x;
-      const overlapRight = brick.x + brick.width - (newBall.x - newBall.radius);
-      const overlapTop = newBall.y + newBall.radius - brick.y;
-      const overlapBottom =
-        brick.y + brick.height - (newBall.y - newBall.radius);
+      if (!isPiercing) {
+        const overlapLeft = newBall.x + newBall.radius - brick.x;
+        const overlapRight =
+          brick.x + brick.width - (newBall.x - newBall.radius);
+        const overlapTop = newBall.y + newBall.radius - brick.y;
+        const overlapBottom =
+          brick.y + brick.height - (newBall.y - newBall.radius);
 
-      const minOverlapX = Math.min(overlapLeft, overlapRight);
-      const minOverlapY = Math.min(overlapTop, overlapBottom);
+        const minOverlapX = Math.min(overlapLeft, overlapRight);
+        const minOverlapY = Math.min(overlapTop, overlapBottom);
 
-      if (minOverlapX < minOverlapY) {
-        newBall.velocity = { ...newBall.velocity, x: -newBall.velocity.x };
-      } else {
-        newBall.velocity = { ...newBall.velocity, y: -newBall.velocity.y };
+        if (minOverlapX < minOverlapY) {
+          newBall.velocity = { ...newBall.velocity, x: -newBall.velocity.x };
+        } else {
+          newBall.velocity = { ...newBall.velocity, y: -newBall.velocity.y };
+        }
+        break;
       }
-
-      break; // 1フレームで1つのブロックのみ破壊
     }
   }
 
-  // 全ブロック破壊で勝利
-  if (newBricks.every((b) => b.destroyed)) {
-    newState = 'victory';
+  return { ball: newBall, bricks: newBricks, destroyedPositions, scoreGained };
+};
+
+/**
+ * ゲームを1フレーム更新
+ * @param game - 現在のゲーム状態
+ * @returns 新しいゲーム状態
+ */
+export const updateGame = (game: BreakoutGame): BreakoutGame => {
+  if (game.state !== 'playing') {
+    return game;
   }
 
-  return {
+  const { ball, extraBalls, paddle, bricks, items, powerUps, config } = game;
+  let newBricks = [...bricks];
+  let newItems = [...items];
+  let newScore = game.score;
+  let newLives = game.lives;
+  let newState: GameState = game.state;
+  let updatedGame = game;
+  const isPiercing = hasPiercingBall(powerUps);
+  const allDestroyedPositions: { x: number; y: number }[] = [];
+
+  // === メインボールの更新 ===
+  const mainBallResult = updateBallPhysics(ball, paddle, config);
+  let newMainBall = mainBallResult.ball;
+  const mainBallFell = mainBallResult.fellDown;
+
+  // メインボールのブロック衝突（落ちてなければ）
+  if (!mainBallFell) {
+    const collision = updateBallBrickCollisions(
+      newMainBall,
+      newBricks,
+      isPiercing,
+      config,
+    );
+    newMainBall = collision.ball;
+    newBricks = collision.bricks;
+    newScore += collision.scoreGained;
+    allDestroyedPositions.push(...collision.destroyedPositions);
+  }
+
+  // === 追加ボールの更新 ===
+  const survivingExtraBalls: Ball[] = [];
+  for (const extraBall of extraBalls) {
+    const result = updateBallPhysics(extraBall, paddle, config);
+
+    // 落ちたボールは削除
+    if (result.fellDown) {
+      continue;
+    }
+
+    // ブロック衝突
+    const collision = updateBallBrickCollisions(
+      result.ball,
+      newBricks,
+      isPiercing,
+      config,
+    );
+    survivingExtraBalls.push(collision.ball);
+    newBricks = collision.bricks;
+    newScore += collision.scoreGained;
+    allDestroyedPositions.push(...collision.destroyedPositions);
+  }
+
+  // === メインボールが落ちた場合の処理 ===
+  if (mainBallFell) {
+    if (survivingExtraBalls.length > 0) {
+      // 追加ボールが残っている → 最初の追加ボールをメインに昇格
+      newMainBall = survivingExtraBalls[0];
+      survivingExtraBalls.shift();
+    } else {
+      // 全ボール落ちた → ライフ減少
+      newLives--;
+      if (newLives <= 0) {
+        newState = 'gameOver';
+      } else {
+        newMainBall = createBall(config, paddle);
+        newState = 'ready';
+      }
+    }
+  }
+
+  // 破壊されたブロックからアイテムをドロップ
+  for (const pos of allDestroyedPositions) {
+    const item = maybeSpawnItem(pos.x, pos.y);
+    if (item) {
+      newItems = [...newItems, item];
+    }
+  }
+
+  // アイテムの更新
+  const collectedItems: Item[] = [];
+  newItems = newItems.reduce<Item[]>((acc, item) => {
+    const updatedItem = { ...item, y: item.y + item.speed };
+
+    if (updatedItem.y - updatedItem.size > config.canvasHeight) {
+      return acc;
+    }
+
+    if (checkItemPaddleCollision(updatedItem, paddle)) {
+      collectedItems.push(updatedItem);
+      return acc;
+    }
+
+    return [...acc, updatedItem];
+  }, []);
+
+  // 全ブロック破壊でレベルクリア
+  if (newBricks.every((b) => b.destroyed)) {
+    newState = 'levelClear';
+  }
+
+  // 仮のゲーム状態を作成
+  updatedGame = {
     ...game,
-    ball: newBall,
+    ball: newMainBall,
+    extraBalls: survivingExtraBalls,
     bricks: newBricks,
+    items: newItems,
     score: newScore,
     lives: newLives,
     state: newState,
   };
+
+  // 収集したアイテムのパワーアップを適用
+  for (const item of collectedItems) {
+    updatedGame = applyPowerUp(updatedGame, item.type);
+  }
+
+  // パワーアップタイマー更新
+  updatedGame = updatePowerUps(updatedGame);
+
+  return updatedGame;
 };
 
 /**
@@ -307,4 +741,62 @@ export const updateGame = (game: BreakoutGame): BreakoutGame => {
  */
 export const resetGame = (game: BreakoutGame): BreakoutGame => {
   return createGame(game.config);
+};
+
+/**
+ * 最大レベル（これをクリアしたら完全勝利）
+ */
+const MAX_LEVEL = 10;
+
+/**
+ * レベルに応じたボール速度倍率
+ * @param level - 現在のレベル
+ * @returns 速度倍率（1.0〜）
+ */
+const getSpeedMultiplier = (level: number): number => {
+  // レベル1: 1.0倍、レベル10: 1.9倍（10%ずつ増加）
+  return 1 + (level - 1) * 0.1;
+};
+
+/**
+ * 次のレベルへ進む
+ * @param game - 現在のゲーム状態
+ * @returns 新しいゲーム状態
+ */
+export const advanceToNextLevel = (game: BreakoutGame): BreakoutGame => {
+  const { config, score, lives, level } = game;
+  const nextLevel = level + 1;
+
+  // 最大レベルクリアで完全勝利
+  if (nextLevel > MAX_LEVEL) {
+    return {
+      ...game,
+      state: 'victory',
+    };
+  }
+
+  // 新しいパドルとボール
+  const paddle = createPaddle(config);
+  const ball = createBall(config, paddle);
+
+  // レベルに応じたボール速度調整（configを更新）
+  const speedMultiplier = getSpeedMultiplier(nextLevel);
+  const newConfig = {
+    ...config,
+    ballSpeed: config.ballSpeed * speedMultiplier / getSpeedMultiplier(level),
+  };
+
+  return {
+    paddle,
+    ball,
+    extraBalls: [],
+    bricks: createBricks(config),
+    items: [],
+    powerUps: [],
+    score, // スコアは維持
+    lives, // ライフも維持
+    level: nextLevel,
+    state: 'ready',
+    config: newConfig,
+  };
 };

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import {
+  advanceToNextLevel,
   createGame,
   launchBall,
   movePaddle,
@@ -7,7 +8,18 @@ import {
   resetGame,
   updateGame,
 } from '@/lib/breakoutLogic';
-import type { BreakoutGame, GameConfig } from '@/schemas/breakout';
+import {
+  addHighScore,
+  getScoreRank,
+  isNewHighScore,
+  loadHighScores,
+  saveHighScores,
+} from '@/lib/highScoreStorage';
+import type {
+  BreakoutGame,
+  GameConfig,
+  HighScoreData,
+} from '@/schemas/breakout';
 import { GameConfigSchema } from '@/schemas/breakout';
 
 /**
@@ -23,6 +35,12 @@ interface BreakoutStore {
   };
   /** アニメーションフレームID */
   animationFrameId: number | null;
+  /** ハイスコアデータ */
+  highScores: HighScoreData;
+  /** 今回の記録がハイスコア更新か */
+  isNewRecord: boolean;
+  /** 今回のランキング順位（1〜10、ランク外は-1） */
+  newRecordRank: number;
 
   // アクション
   /** ゲームを開始/再開 */
@@ -47,6 +65,10 @@ interface BreakoutStore {
   startGameLoop: () => void;
   /** ゲームループを停止 */
   stopGameLoop: () => void;
+  /** ハイスコアをチェックして更新（ゲーム終了時に呼び出し） */
+  checkAndUpdateHighScore: () => void;
+  /** ハイスコアデータを再読み込み */
+  reloadHighScores: () => void;
 }
 
 /**
@@ -61,18 +83,37 @@ export const useBreakoutStore = create<BreakoutStore>((set, get) => ({
   game: createGame(defaultConfig),
   keys: { left: false, right: false },
   animationFrameId: null,
+  highScores: loadHighScores(),
+  isNewRecord: false,
+  newRecordRank: -1,
 
   start: () => {
     const { game } = get();
     if (game.state === 'ready') {
-      set({ game: launchBall(game) });
+      set({ game: launchBall(game), isNewRecord: false, newRecordRank: -1 });
       get().startGameLoop();
     } else if (game.state === 'paused') {
       set({ game: { ...game, state: 'playing' } });
       get().startGameLoop();
+    } else if (game.state === 'levelClear') {
+      // 次のレベルへ進む
+      const nextGame = advanceToNextLevel(game);
+      if (nextGame.state === 'victory') {
+        // 最終レベルクリア → ハイスコアチェック
+        set({ game: nextGame });
+        get().checkAndUpdateHighScore();
+      } else {
+        // 次のレベルへ → 即座に発射
+        set({ game: launchBall(nextGame) });
+        get().startGameLoop();
+      }
     } else if (game.state === 'gameOver' || game.state === 'victory') {
       const newGame = resetGame(game);
-      set({ game: launchBall(newGame) });
+      set({
+        game: launchBall(newGame),
+        isNewRecord: false,
+        newRecordRank: -1,
+      });
       get().startGameLoop();
     }
   },
@@ -87,7 +128,11 @@ export const useBreakoutStore = create<BreakoutStore>((set, get) => ({
 
   reset: () => {
     get().stopGameLoop();
-    set({ game: createGame(defaultConfig) });
+    set({
+      game: createGame(defaultConfig),
+      isNewRecord: false,
+      newRecordRank: -1,
+    });
   },
 
   handleKeyDown: (key: string) => {
@@ -162,12 +207,23 @@ export const useBreakoutStore = create<BreakoutStore>((set, get) => ({
     // ゲーム状態を更新
     const updatedGame = updateGame({ ...game, paddle: newPaddle });
 
-    // ゲーム終了時はループを停止
-    if (
-      updatedGame.state === 'gameOver' ||
-      updatedGame.state === 'victory' ||
-      updatedGame.state === 'ready'
-    ) {
+    // ゲーム終了時はループを停止してハイスコアチェック
+    if (updatedGame.state === 'gameOver' || updatedGame.state === 'victory') {
+      get().stopGameLoop();
+      set({ game: updatedGame });
+      get().checkAndUpdateHighScore();
+      return;
+    }
+
+    // レベルクリア時はループを停止（次レベルへの遷移待ち）
+    if (updatedGame.state === 'levelClear') {
+      get().stopGameLoop();
+      set({ game: updatedGame });
+      return;
+    }
+
+    // ライフ減少でready状態に戻った場合
+    if (updatedGame.state === 'ready') {
       get().stopGameLoop();
     }
 
@@ -194,5 +250,25 @@ export const useBreakoutStore = create<BreakoutStore>((set, get) => ({
       cancelAnimationFrame(animationFrameId);
       set({ animationFrameId: null });
     }
+  },
+
+  checkAndUpdateHighScore: () => {
+    const { game, highScores } = get();
+    const { score, level } = game;
+
+    if (isNewHighScore(score, highScores.scores)) {
+      const rank = getScoreRank(score, highScores.scores);
+      const updatedData = addHighScore(score, level, highScores);
+      saveHighScores(updatedData);
+      set({
+        highScores: updatedData,
+        isNewRecord: true,
+        newRecordRank: rank,
+      });
+    }
+  },
+
+  reloadHighScores: () => {
+    set({ highScores: loadHighScores() });
   },
 }));
