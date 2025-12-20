@@ -5,7 +5,7 @@ import {
   OctagonXIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { type CSSProperties, type FC } from 'react';
+import type { CSSProperties, FC } from 'react';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
 /**

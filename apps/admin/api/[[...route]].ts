@@ -11,10 +11,14 @@ type NodeRes = ServerResponse<IncomingMessage>;
 
 const toUrl = (req: NodeReq) => {
   const protoHeader = req.headers['x-forwarded-proto'];
-  const proto = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader ?? 'https';
+  const proto = Array.isArray(protoHeader)
+    ? protoHeader[0]
+    : (protoHeader ?? 'https');
 
   const hostHeader = req.headers['x-forwarded-host'] ?? req.headers.host;
-  const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader ?? 'localhost';
+  const host = Array.isArray(hostHeader)
+    ? hostHeader[0]
+    : (hostHeader ?? 'localhost');
 
   const path = req.url ?? '/';
   return new URL(path, `${proto}://${host}`);
@@ -44,7 +48,8 @@ const readBody = async (req: NodeReq) => {
 
   const chunks: Uint8Array[] = [];
   for await (const chunk of req) {
-    const buf = typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk);
+    const buf =
+      typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk);
     chunks.push(buf);
   }
   const body = Buffer.concat(chunks);

@@ -151,6 +151,11 @@ app.onError((err, c) => {
   return c.json(errorResponse, 500);
 });
 
+/**
+ * APIルートのみをエクスポート（dev.tsで使用）
+ */
+export const apiRoutes = healthRoutes;
+
 export type AppType = typeof app;
 export { app };
 export default app;

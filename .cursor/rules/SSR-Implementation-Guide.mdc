@@ -4,6 +4,19 @@
 
 ---
 
+## ⚠️ このガイドのスコープ
+
+| 環境 | レンダリング方式 | 使用ファイル |
+|------|-----------------|-------------|
+| ローカル開発 | SSR + HMR | `server/dev.ts` |
+| 本番（セルフホスト） | SSR | `server/production.ts` + `src/entry-server.tsx` |
+| **Vercel** | **CSR + Serverless** | `dist/` + `api/*.ts` |
+
+> 💡 **開発環境と本番（セルフホスト）ではSSRが有効**、**VercelではCSR + Serverless** という構成です。
+> Vercelデプロイの詳細は末尾の「Vercelデプロイとの関係」セクションを参照。
+
+---
+
 ## 🎯 このガイドの目的
 
 モノレポ構成のReactアプリケーションに、以下を実現するSSRを実装する：
@@ -77,15 +90,21 @@
 
 ```
 apps/{app-name}/
+├── api/
+│   └── [[...route]].ts # Vercel Serverless Functions エントリー
 ├── server/
 │   ├── dev.ts          # 開発用SSRサーバー（Vite統合）
-│   ├── production.ts   # 本番用サーバー
+│   ├── production.ts   # 本番用SSRサーバー（セルフホスト）
+│   ├── appVercel.ts    # Vercel用Honoアプリ（軽量版）
 │   └── app.ts          # APIルート定義
 ├── src/
 │   ├── main.tsx        # クライアントエントリー（ハイドレーション）
+│   ├── entry-server.tsx # 本番SSR用エントリー
 │   ├── App.tsx         # ルートコンポーネント
 │   └── ...
+├── middleware.ts       # Vercel Edge Middleware（認証等）
 ├── vite.config.ts      # SSR設定を含むVite設定
+├── vercel.json         # Vercelデプロイ設定
 ├── package.json
 └── tsconfig.json
 ```
@@ -138,9 +157,41 @@ export default defineConfig({
 });
 ```
 
-### Step 2: server/dev.ts を実装
+### Step 2: index.html にSSRプレースホルダーを追加
+
+> 💡 **Single Source of Truth**: index.html を唯一のHTMLテンプレートとして使用し、SSRとCSRで2重管理を避ける
+
+```html
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><!--ssr-title-->App Title<!--/ssr-title--></title>
+    <meta name="description" content="<!--ssr-description-->App Description<!--/ssr-description-->" />
+    <!--ssr-head-->
+  </head>
+  <body>
+    <div id="root"><!--ssr-outlet--></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+```
+
+**プレースホルダーの説明:**
+
+| プレースホルダー | 用途 | CSR時 | SSR時 |
+|-----------------|------|-------|-------|
+| `<!--ssr-title-->...<!--/ssr-title-->` | ページタイトル | デフォルト値を表示 | 動的に置換 |
+| `<!--ssr-description-->...<!--/ssr-description-->` | meta description | デフォルト値を表示 | 動的に置換 |
+| `<!--ssr-head-->` | 追加のheadタグ | 何も出力しない | `__INITIAL_DATA__`等を注入 |
+| `<!--ssr-outlet-->` | Reactアプリの出力先 | 空（CSRで描画） | SSR HTMLを注入 |
+
+### Step 3: server/dev.ts を実装
 
 ```typescript
+import { readFile } from 'node:fs/promises';
 import { serve } from '@hono/node-server';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { basicAuth } from 'hono/basic-auth';
@@ -175,9 +226,7 @@ const startDevServer = async () => {
   const port = Number(process.env.API_PORT) || 3002;
 
   // Vite dev serverを起動
-  console.log('🔧 Starting Vite dev server...');
   await createVite();
-  console.log('✅ Vite dev server ready');
 
   // Honoアプリを作成
   const app = new OpenAPIHono();
@@ -194,30 +243,13 @@ const startDevServer = async () => {
   // APIルートをマウント
   app.route('/api', apiRoutes);
 
-  // Vite関連アセットをプロキシ
-  const VITE_PROXY_PATHS = [
-    '/src/*',
-    '/@vite/*',
-    '/@fs/*',
-    '/@id/*',
-    '/@react-refresh',
-    '/node_modules/*',
-  ];
-
-  for (const path of VITE_PROXY_PATHS) {
-    app.use(path, async (c) => {
-      const url = new URL(c.req.url);
-      const viteUrl = `http://localhost:5175${url.pathname}${url.search}`;
-      const res = await fetch(viteUrl);
-      return new Response(res.body, {
-        status: res.status,
-        headers: res.headers,
-      });
-    });
-  }
+  // Vite関連アセットをプロキシ（省略）
+  // ...
 
   // React SSRエンドポイント
   app.get('*', async (c) => {
+    const url = c.req.url;
+
     try {
       // 初期データを生成
       const initialData = {
@@ -234,41 +266,29 @@ const startDevServer = async () => {
         createElement(StrictMode, {}, createElement(App, { initialData })),
       );
 
-      // HTMLテンプレート
-      const template = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${initialData.title}</title>
-  <meta name="description" content="${initialData.description}">
-  <script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script>
-</head>
-<body>
-  <div id="root">${appHtml}</div>
-  <script type="module" src="http://localhost:5175/src/main.tsx"></script>
-  <script type="module">
-    import RefreshRuntime from 'http://localhost:5175/@react-refresh'
-    RefreshRuntime.injectIntoGlobalHook(window)
-    window.$RefreshReg$ = () => {}
-    window.$RefreshSig$ = () => (type) => type
-    window.__vite_plugin_react_preamble_installed__ = true
-  </script>
-</body>
-</html>`;
+      // index.html を読み込み（Single Source of Truth）
+      const rawTemplate = await readFile('index.html', 'utf-8');
 
-      // ViteのHTML変換を適用
-      const html = await vite.transformIndexHtml(c.req.url, template);
+      // ViteのHTML変換を適用（HMRクライアント注入、モジュールパス解決）
+      const template = await vite.transformIndexHtml(url, rawTemplate);
+
+      // SSR用プレースホルダーを置換
+      const html = template
+        .replace(/<!--ssr-title-->.*?<!--\/ssr-title-->/, initialData.title)
+        .replace(/<!--ssr-description-->.*?<!--\/ssr-description-->/, initialData.description)
+        .replace('<!--ssr-head-->', `<script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script>`)
+        .replace('<!--ssr-outlet-->', appHtml);
+
       return c.html(html);
     } catch (error) {
       if (error instanceof Error) {
         vite.ssrFixStacktrace(error);
         console.error('❌ SSR Error:', error.message);
       }
-      // エラー時はCSRにフォールバック
-      return c.html(`<html><body><div id="root"></div>
-        <script type="module" src="http://localhost:5175/src/main.tsx"></script>
-      </body></html>`, 500);
+      // エラー時はindex.htmlをそのまま返す（CSRフォールバック）
+      const fallbackTemplate = await readFile('index.html', 'utf-8');
+      const fallbackHtml = await vite.transformIndexHtml(url, fallbackTemplate);
+      return c.html(fallbackHtml, 500);
     }
   });
 
@@ -278,7 +298,7 @@ const startDevServer = async () => {
 startDevServer();
 ```
 
-### Step 3: src/main.tsx を実装（ハイドレーション対応）
+### Step 4: src/main.tsx を実装（ハイドレーション対応）
 
 ```typescript
 import { StrictMode } from 'react';
@@ -337,7 +357,7 @@ if (rootElement.hasChildNodes()) {
 }
 ```
 
-### Step 4: src/App.tsx で初期データを受け取る
+### Step 5: src/App.tsx で初期データを受け取る
 
 ```typescript
 import type { FC } from 'react';
@@ -361,7 +381,7 @@ export const App: FC<AppProps> = ({ initialData }) => {
 };
 ```
 
-### Step 5: server/app.ts を簡素化（APIルートのみ）
+### Step 6: server/app.ts を簡素化（APIルートのみ）
 
 ```typescript
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -382,20 +402,6 @@ app.route('/api', healthRoutes);
 export const apiRoutes = healthRoutes;
 export { app };
 ```
-
-### Step 6: packages/ui のコンポーネントにReactをインポート
-
-SSR環境では、JSXを使用するファイルで明示的にReactをインポートする必要がある：
-
-```typescript
-// packages/ui/src/Button.tsx
-// biome-ignore lint/correctness/noUnusedImports: SSRでJSXを使用するために必要
-import React, { type ButtonHTMLAttributes, type FC } from 'react';
-
-// ... コンポーネント実装
-```
-
----
 
 ## 🔍 トラブルシューティング
 
@@ -433,7 +439,7 @@ ssr: {
 
 **原因**: JSXファイルでReactがグローバルに参照されている
 
-**解決策**: 共有UIパッケージ内のJSXファイルで明示的にReactをインポート
+**解決策**: `vite.config.ts` で `jsxRuntime: 'automatic'` を設定（React 17+）
 
 ### ハイドレーション不一致
 
@@ -457,18 +463,133 @@ ssr: {
 
 ---
 
+## 🏭 本番環境SSR実装
+
+本番環境（セルフホスト）でもSSRを有効にするための追加設定。
+
+### Step 7: src/entry-server.tsx を作成
+
+```typescript
+import { createElement, StrictMode } from 'react';
+import { renderToString } from 'react-dom/server';
+import { App } from './App';
+
+interface InitialData {
+  title: string;
+  description: string;
+  timestamp: string;
+}
+
+/**
+ * サーバーサイドレンダリング関数
+ */
+export const render = (initialData: InitialData): string => {
+  return renderToString(
+    createElement(StrictMode, {}, createElement(App, { initialData })),
+  );
+};
+
+/**
+ * デフォルトの初期データを生成
+ */
+export const getInitialData = (): InitialData => ({
+  title: 'App Title',
+  description: 'App Description',
+  timestamp: new Date().toISOString(),
+});
+```
+
+### Step 8: package.json のビルドスクリプトを更新
+
+```json
+{
+  "scripts": {
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist/server"
+  }
+}
+```
+
+### Step 9: server/production.ts を SSR対応に更新
+
+```typescript
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
+import { OpenAPIHono } from '@hono/zod-openapi';
+import { basicAuth } from 'hono/basic-auth';
+import { app } from './app.js';
+
+interface SSRModule {
+  render: (initialData: { title: string; description: string; timestamp: string }) => string;
+  getInitialData: () => { title: string; description: string; timestamp: string };
+}
+
+const startProductionServer = async () => {
+  const port = Number(process.env.API_PORT) || 3000;
+  const distPath = join(process.cwd(), 'dist');
+
+  // SSRモジュールを読み込み
+  const ssrModule: SSRModule = await import(join(distPath, 'server', 'entry-server.js'));
+
+  // index.htmlテンプレートを読み込み
+  const template = await readFile(join(distPath, 'index.html'), 'utf-8');
+
+  const prodApp = new OpenAPIHono();
+
+  // 認証設定...
+  // APIルートをマウント...
+  // 静的ファイル配信...
+
+  // SSRフォールバック
+  prodApp.get('*', async (c) => {
+    const initialData = ssrModule.getInitialData();
+    const appHtml = ssrModule.render(initialData);
+
+    const html = template
+      .replace(/<!--ssr-title-->.*?<!--\/ssr-title-->/, initialData.title)
+      .replace(/<!--ssr-description-->.*?<!--\/ssr-description-->/, initialData.description)
+      .replace('<!--ssr-head-->', `<script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script>`)
+      .replace('<!--ssr-outlet-->', appHtml);
+
+    return c.html(html);
+  });
+
+  serve({ fetch: prodApp.fetch, port });
+};
+
+startProductionServer();
+```
+
+---
+
 ## ✅ チェックリスト
 
-SSRを実装する際のチェックリスト：
+### 開発環境SSR実装
 
 - [ ] `vite.config.ts`に`ssr.external`設定を追加
-- [ ] `server/dev.ts`でVite統合SSRサーバーを実装
+- [ ] `vite.config.ts`で`jsxRuntime: 'automatic'`を設定
+- [ ] `index.html`にSSRプレースホルダーを追加（Single Source of Truth）
+- [ ] `server/dev.ts`でindex.htmlを読み込みSSRを実装
 - [ ] `src/main.tsx`でハイドレーション対応
 - [ ] `src/App.tsx`で`initialData`プロップスを受け取る
-- [ ] 共有UIパッケージで明示的にReactをインポート
-- [ ] HTMLテンプレートにpreambleスクリプトを追加
 - [ ] `window.__INITIAL_DATA__`で初期データを注入
 - [ ] エラーハンドリングでCSRフォールバックを実装
+
+### 本番環境SSR実装（セルフホスト）
+
+- [ ] `src/entry-server.tsx`でSSRレンダリング関数を実装
+- [ ] `package.json`のビルドスクリプトにSSRビルドを追加
+- [ ] `server/production.ts`でSSRモジュールを読み込み
+- [ ] マニフェストファイルを使用してアセットパスを解決
+
+### Vercelデプロイ対応
+
+- [ ] `api/[[...route]].ts`でHonoアプリをエクスポート
+- [ ] `server/appVercel.ts`で軽量版Honoアプリを実装
+- [ ] `middleware.ts`でEdge Middleware認証を実装
+- [ ] `vercel.json`でビルド設定を定義
+- [ ] CSRビルドが正常に通ることを確認（`pnpm build`）
 
 ---
 
@@ -477,7 +598,101 @@ SSRを実装する際のチェックリスト：
 ```bash
 # 開発サーバー起動（SSR + HMR）
 pnpm --filter @goui/{app-name} dev:api
+
+# 本番ビルド（クライアント + SSRバンドル）
+pnpm --filter @goui/{app-name} build
+
+# 本番サーバー起動（SSR対応）
+pnpm --filter @goui/{app-name} start
+
+# Vercelローカルプレビュー
+vercel dev --cwd apps/{app-name}
+
+# Vercelデプロイ（Git連携推奨）
+git push origin main  # 自動デプロイ
 ```
+
+---
+
+## 🌐 Vercelデプロイとの関係
+
+### なぜVercelでSSRを使わないのか
+
+1. **Vercel Edge Runtimeの制約**: `react-dom/server` などNode.js依存モジュールが動かない
+2. **コスト効率**: 静的HTML + Serverless の方がスケーラブル
+3. **シンプルさ**: Hono公式推奨のゼロコンフィグデプロイ
+
+### Vercel用ファイル構成
+
+```
+apps/{app-name}/
+├── api/
+│   └── [[...route]].ts  # → Serverless Functions
+├── middleware.ts         # → Edge Middleware（認証等）
+├── server/
+│   └── appVercel.ts      # Vercel用Honoアプリ（軽量版）
+└── dist/                 # → 静的ファイル（CSR）
+```
+
+### api/[[...route]].ts の実装
+
+Hono公式ドキュメント推奨のシンプルな形式：
+
+```typescript
+import app from '../server/appVercel.js';
+
+export default app;  // これだけでOK！
+```
+
+> 📝 **参考**: [Hono - Vercel](https://hono.dev/docs/getting-started/vercel)
+
+### server/appVercel.ts の役割
+
+Vercel Serverless Functions用の軽量Honoアプリ：
+
+```typescript
+import { OpenAPIHono } from '@hono/zod-openapi';
+
+const app = new OpenAPIHono();
+
+// ヘルスチェック
+app.get('/health', (c) => c.json({ status: 'ok' }));
+
+// APIルート
+app.route('/api', apiRoutes);
+
+export default app;
+```
+
+**注意**: `@hono/zod-openapi`、`@scalar/hono-api-reference` などはEdge Runtimeで動作しないため、Vercel用アプリでは使用を避けるか、インライン実装にする。
+
+### middleware.ts の役割
+
+Vercel Edge Middlewareで認証などを実装：
+
+```typescript
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|health).*)'],
+};
+
+export const middleware = (request: NextRequest) => {
+  // Basic認証など
+  // ...
+  return NextResponse.next();
+};
+```
+
+### 開発環境とVercel環境の違い
+
+| 項目 | 開発環境 | Vercel |
+|------|---------|--------|
+| フロントエンド | SSR（`server/dev.ts`） | CSR（`dist/`静的ファイル） |
+| API | Hono + Node.js | Hono + Serverless Functions |
+| 認証 | Honoミドルウェア | Edge Middleware |
+| HMR/Fast Refresh | ✅ | N/A（本番環境） |
 
 ---
 
@@ -486,3 +701,4 @@ pnpm --filter @goui/{app-name} dev:api
 - [Vite SSR Guide](https://vite.dev/guide/ssr.html)
 - [React 19 Server APIs](https://react.dev/reference/react-dom/server)
 - [Hono Documentation](https://hono.dev/)
+- [Hono - Vercel Deployment](https://hono.dev/docs/getting-started/vercel)

@@ -1,5 +1,5 @@
-import { Hono } from 'hono';
 import * as shared from '@goui/shared';
+import { Hono } from 'hono';
 
 /**
  * Vercel Functions向けのHonoアプリケーション（切り分け用）
@@ -24,7 +24,9 @@ const createApp = () => {
       './routes/users/index.js',
     ] as const;
 
-    const isAllowed = (value: string): value is (typeof allowedTargets)[number] =>
+    const isAllowed = (
+      value: string,
+    ): value is (typeof allowedTargets)[number] =>
       (allowedTargets as readonly string[]).includes(value);
 
     if (!target || !isAllowed(target)) {
@@ -66,5 +68,3 @@ const createApp = () => {
 };
 
 export default createApp();
-
-

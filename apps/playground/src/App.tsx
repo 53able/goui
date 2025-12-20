@@ -31,7 +31,9 @@ export const App: FC<AppProps> = ({ initialData }) => {
         <div className="fixed top-0 right-0 m-4 p-4 bg-black/80 text-white text-xs rounded shadow-lg max-w-xs">
           <div className="font-bold mb-2">🚀 SSR Debug Info</div>
           <div>Title: {initialData.title}</div>
-          <div>Rendered: {new Date(initialData.timestamp).toLocaleString()}</div>
+          <div>
+            Rendered: {new Date(initialData.timestamp).toLocaleString()}
+          </div>
         </div>
       )}
       <LifeGame />

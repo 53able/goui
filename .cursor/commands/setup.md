@@ -80,48 +80,56 @@ pnpm build
 
 ---
 
-## 開発時の起動
+## 開発時の起動（SSR + HMR）
+
+> 💡 開発環境ではSSRサーバー（`dev:api`）を起動して、SSRサーバー経由でアクセスする
 
 ### 方法1: 個別起動（推奨）
 
 ```bash
-# ターミナル1: Webアプリ（@myorg/web）
-cd apps/web && pnpm dev          # http://localhost:5173
+# ターミナル1: Webアプリ（SSRサーバー）
+cd apps/web && pnpm dev:api      # http://localhost:3000 ← メインアクセスURL
 
-# ターミナル2: 管理画面（@myorg/admin）
-cd apps/admin && pnpm dev        # http://localhost:5174
+# ターミナル2: 管理画面（SSRサーバー）
+cd apps/admin && pnpm dev:api    # http://localhost:3001 ← メインアクセスURL
 
-# ターミナル3: APIサーバー（@myorg/web内）
-cd apps/web && pnpm dev:api      # http://localhost:3000
+# ターミナル3: Playground（SSRサーバー）
+cd apps/playground && pnpm dev:api  # http://localhost:3002 ← メインアクセスURL
 ```
+
+> ⚠️ SSRサーバーが内部でVite Dev Serverも起動するため、`pnpm dev`（Viteのみ）は不要
 
 ### 方法2: フィルター指定
 
 ```bash
-# 特定のアプリのみ起動
-pnpm --filter @myorg/web dev
-pnpm --filter @myorg/admin dev
+# 特定のアプリのSSRサーバーを起動
+pnpm --filter @myorg/web dev:api
+pnpm --filter @myorg/admin dev:api
 ```
 
 ### 方法3: Turborepo一括起動
 
 ```bash
-# 全アプリを同時起動
+# 全アプリを同時起動（SSRサーバー）
 pnpm dev
 ```
 
 ---
 
-## 開発時のエンドポイント
+## 開発時のエンドポイント（SSR + HMR）
 
-| URL | アプリ | 説明 |
-|-----|--------|------|
-| `http://localhost:5173` | @myorg/web | メインWebアプリ |
-| `http://localhost:5174` | @myorg/admin | 管理画面 |
-| `http://localhost:5175` | @myorg/playground | 実験場（ライフゲームなど） |
-| `http://localhost:3000` | API (web) | バックエンドAPIサーバー |
-| `http://localhost:3000/api/ui` | API (web) | Swagger UI |
-| `http://localhost:3000/api/doc` | API (web) | OpenAPI JSON |
+> 💡 開発時は **SSRサーバー（300x）** にアクセスする。Vite Dev（517x）はHMR用で内部的に使用される。
+
+| URL | 種別 | 説明 |
+|-----|------|------|
+| `http://localhost:3000` | **SSRサーバー (web)** | メインアクセスURL - SSR + API + HMR |
+| `http://localhost:3001` | **SSRサーバー (admin)** | メインアクセスURL - SSR + API + HMR |
+| `http://localhost:3002` | **SSRサーバー (playground)** | メインアクセスURL - SSR + API + HMR |
+| `http://localhost:5173` | Vite Dev (web) | HMR用（直接アクセスはCSR） |
+| `http://localhost:5174` | Vite Dev (admin) | HMR用（直接アクセスはCSR） |
+| `http://localhost:5175` | Vite Dev (playground) | HMR用（直接アクセスはCSR） |
+| `http://localhost:300x/api/ui` | Swagger UI | OpenAPIドキュメント |
+| `http://localhost:300x/api/doc` | OpenAPI JSON | API仕様書 |
 
 ### curlでのAPI呼び出し例
 
@@ -130,25 +138,112 @@ pnpm dev
 curl -u admin:admin http://localhost:3000/api/v1/users
 ```
 
+### SSRとHMRの動作確認
+
+```bash
+# SSRが動作しているか確認（初回レスポンスでHTMLが返る）
+curl -s http://localhost:3000 | grep -o '<div id="root">.*</div>' | head -1
+
+# HMRが有効か確認（コンソールに「Hydrating React app...」と表示される）
+# ブラウザでアクセスして開発者ツールを確認
+```
+
 ---
 
 ## 本番ビルド
 
 ```bash
-# 全パッケージをビルド（Turborepoで依存順に実行）
+# 全パッケージをビルド（クライアント + SSRバンドル、Turborepoで依存順に実行）
 pnpm build
 
 # 特定のアプリのみビルド
 pnpm build --filter=@myorg/web
 ```
 
+> 💡 **ビルド出力**:
+> - `dist/` - クライアントビルド（静的ファイル + manifest.json）
+> - `dist/server/` - SSRバンドル（entry-server.js）
+
+---
+
+## 本番SSRサーバー起動（セルフホスト）
+
+```bash
+# 特定のアプリの本番サーバーを起動
+pnpm --filter @myorg/web start
+pnpm --filter @myorg/admin start
+pnpm --filter @myorg/playground start
+```
+
+> ⚠️ **事前に `pnpm build` が必要です。** SSRバンドル（`dist/server/entry-server.js`）が読み込まれます。
+
 ---
 
 ## Vercelへのデプロイ（マルチプロジェクト）
 
-### 各アプリを別プロジェクトとしてデプロイ
-
 > 💡 **Note**: 各アプリには `vercel.json` が設定済み。Build Command、Install Command、rewrites などは自動で適用されます。
+
+### 🚀 推奨: モノレポ一括リンク（vercel link --repo）
+
+モノレポ全体を一度にリンクする方法。**CLIのみで完結**できる。
+
+#### Step 1: モノレポをVercelにリンク
+
+```bash
+cd /path/to/project-root
+vercel link --repo --yes
+```
+
+これで `.vercel/repo.json` が作成され、全プロジェクトがリンクされる：
+
+```json
+{
+  "orgId": "team_xxxxx",
+  "projects": [
+    { "id": "prj_xxxxx", "name": "web", "directory": "apps/web" },
+    { "id": "prj_xxxxx", "name": "admin", "directory": "apps/admin" },
+    { "id": "prj_xxxxx", "name": "playground", "directory": "apps/playground" }
+  ]
+}
+```
+
+#### Step 2: 環境変数でプロジェクト指定デプロイ
+
+```bash
+# repo.json から ORG_ID と PROJECT_ID を取得してデプロイ
+VERCEL_ORG_ID=team_xxxxx \
+VERCEL_PROJECT_ID=prj_xxxxx \
+vercel deploy --prod --yes
+```
+
+#### デプロイスクリプト例
+
+```bash
+#!/bin/bash
+# deploy.sh - 特定のプロジェクトをデプロイ
+
+ORG_ID="team_xxxxx"
+
+case "$1" in
+  web)
+    PROJECT_ID="prj_xxxxx" ;;
+  admin)
+    PROJECT_ID="prj_xxxxx" ;;
+  playground)
+    PROJECT_ID="prj_xxxxx" ;;
+  *)
+    echo "Usage: $0 {web|admin|playground}"
+    exit 1 ;;
+esac
+
+VERCEL_ORG_ID=$ORG_ID VERCEL_PROJECT_ID=$PROJECT_ID vercel deploy --prod --yes
+```
+
+---
+
+### 従来の方法: 個別リンク
+
+各アプリディレクトリで個別にリンクする方法。
 
 #### @myorg/web のデプロイ
 
@@ -168,6 +263,18 @@ vercel env add BASIC_AUTH_PASSWORD
 # デプロイ
 vercel deploy
 ```
+
+#### @myorg/admin のデプロイ
+
+```bash
+cd apps/admin
+vercel link
+vercel deploy
+```
+
+---
+
+### 環境変数の設定
 
 #### 環境変数の一括設定（.env から Vercel へ）
 
@@ -192,14 +299,6 @@ done < .env.production
 ```bash
 # Vercelに設定済みの環境変数をローカルに取得
 vercel env pull .env.local
-```
-
-#### @myorg/admin のデプロイ
-
-```bash
-cd apps/admin
-vercel link
-vercel deploy
 ```
 
 ### Vercel Dashboard設定
@@ -265,10 +364,12 @@ git diff HEAD^ HEAD --quiet ./apps/web ./packages/
 
 ## 新しいアプリの追加
 
+> 📝 詳細な手順は `.cursor/commands/add-app.md` を参照
+
 ### Step 1: ディレクトリ作成
 
 ```bash
-mkdir -p apps/新アプリ/src
+mkdir -p apps/新アプリ/{src,server/routes,api}
 ```
 
 ### Step 2: package.json 作成
@@ -342,11 +443,12 @@ EOF
 
 > ⚠️ `server.port` を既存アプリと被らないように設定！
 
-| アプリ | ポート |
-|--------|--------|
-| @myorg/web | 5173 |
-| @myorg/admin | 5174 |
-| 新アプリ | 5175〜 |
+| アプリ | SSRサーバー | Vite Dev |
+|--------|------------|----------|
+| @myorg/web | 3000 | 5173 |
+| @myorg/admin | 3001 | 5174 |
+| @myorg/playground | 3002 | 5175 |
+| 新アプリ | 3003〜 | 5176〜 |
 
 ```bash
 cat << 'EOF' > apps/新アプリ/vite.config.ts
@@ -478,11 +580,14 @@ pnpm --filter @myorg/新アプリ dev
 
 ### 🎉 完了チェックリスト
 
-- [ ] `http://localhost:5175` でアプリが表示される
+- [ ] `http://localhost:300x`（SSRサーバー）でアプリが表示される
+- [ ] ソース変更時にHMRが動作する
 - [ ] `@myorg/ui` のButtonコンポーネントが動作する
 - [ ] ダークモード切り替えでテーマが変わる
 - [ ] `pnpm typecheck` が通る
 - [ ] `pnpm lint` が通る
+
+> 📝 新規アプリ追加の詳細は `.cursor/commands/add-app.md` を参照
 
 ---
 
@@ -491,16 +596,17 @@ pnpm --filter @myorg/新アプリ dev
 | カテゴリ | コマンド | 用途 |
 |---------|---------|------|
 | **Setup** | `pnpm install` | 全ワークスペースの依存関係インストール |
-| **Dev** | `pnpm dev` | 全アプリを同時起動（Turborepo） |
-| **Dev** | `pnpm --filter @myorg/web dev` | 特定アプリのみ起動 |
-| **Dev** | `cd apps/web && pnpm dev:api` | APIサーバー起動 |
-| **Build** | `pnpm build` | 全パッケージビルド |
+| **Dev** | `pnpm dev` | 全アプリのSSRサーバーを同時起動（Turborepo） |
+| **Dev** | `pnpm --filter @myorg/web dev:api` | 特定アプリのSSRサーバーを起動 |
+| **Dev** | `pnpm --filter @myorg/web dev` | Vite Devのみ起動（CSR、通常は不要） |
+| **Build** | `pnpm build` | 全パッケージビルド（クライアント + SSRバンドル） |
 | **Build** | `pnpm build --filter=@myorg/web` | 特定アプリのみビルド |
 | **Quality** | `pnpm typecheck` | 型チェック（全パッケージ） |
 | **Quality** | `pnpm lint` | Linting（全パッケージ） |
 | **Quality** | `pnpm test` | テスト実行（全パッケージ） |
-| **Vercel** | `vercel deploy` | Vercelプレビューデプロイ |
-| **Vercel** | `vercel deploy --prod` | Vercel本番デプロイ |
+| **Production** | `pnpm --filter @myorg/web start` | 本番SSRサーバー起動（セルフホスト） |
+| **Vercel** | `vercel dev --cwd apps/web` | Vercelローカルプレビュー |
+| **Vercel** | `git push origin main` | Vercel自動デプロイ（Git連携推奨） |
 
 ---
 

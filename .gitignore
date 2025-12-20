@@ -37,3 +37,4 @@ tmp/
 # TypeScript
 *.tsbuildinfo
 .vercel
+.env*.local

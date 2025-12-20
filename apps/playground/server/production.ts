@@ -1,38 +1,132 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { basicAuth } from 'hono/basic-auth';
 import { app } from './app.js';
 
 /**
- * 本番用サーバー（VPS/セルフホスト用）
- * @description React SSR + API認証
+ * SSRモジュールの型定義
+ */
+interface SSRModule {
+  render: (initialData: {
+    title: string;
+    description: string;
+    timestamp: string;
+  }) => string;
+  getInitialData: () => {
+    title: string;
+    description: string;
+    timestamp: string;
+  };
+}
+
+/**
+ * 本番用SSRサーバー（VPS/セルフホスト用）
+ * @description SSR + API、API部分にBasic認証を適用
  * @note Vercelデプロイでは使用しない
  */
-const prodApp = new OpenAPIHono();
+const startProductionServer = async () => {
+  const port = Number(process.env.PLAYGROUND_PORT) || 3002;
+  const distPath = join(process.cwd(), 'dist');
 
-// API部分にBasic認証を適用
-prodApp.use(
-  '/api/v1/*',
-  basicAuth({
-    username: process.env.BASIC_AUTH_USERNAME ?? 'admin',
-    password: process.env.BASIC_AUTH_PASSWORD ?? 'admin',
-  }),
-);
+  // SSRモジュールを読み込み
+  let ssrModule: SSRModule;
+  try {
+    ssrModule = await import(join(distPath, 'server', 'entry-server.js'));
+  } catch (error) {
+    console.error('❌ SSRモジュールの読み込みに失敗しました');
+    console.error('💡 `pnpm build` を実行してSSRバンドルを生成してください');
+    console.error(error);
+    process.exit(1);
+  }
 
-// SSR対応のアプリルートをマウント
-// app.ts 内で React SSR と静的ファイル配信を処理
-prodApp.route('/', app);
+  // index.htmlテンプレートを読み込み
+  let template: string;
+  try {
+    template = await readFile(join(distPath, 'index.html'), 'utf-8');
+  } catch (error) {
+    console.error('❌ index.htmlの読み込みに失敗しました');
+    console.error('💡 `pnpm build` を実行してビルドしてください');
+    console.error(error);
+    process.exit(1);
+  }
 
-const port = Number(process.env.PLAYGROUND_PORT) || 3002;
+  const prodApp = new OpenAPIHono();
 
-console.log('🚀 playground Production Server (Self-hosted) with SSR');
-console.log(`🌐 Application: http://localhost:${port}`);
-console.log(`📖 Swagger UI: http://localhost:${port}/api/ui`);
-console.log(`📄 OpenAPI JSON: http://localhost:${port}/api/doc`);
-console.log('🔐 API認証: /api/v1/* のみ');
-console.log('⚡ React SSR enabled');
+  // API部分にBasic認証を適用
+  prodApp.use('/api/v1/*', async (c, next) => {
+    const auth = basicAuth({
+      username: process.env.BASIC_AUTH_USERNAME ?? 'admin',
+      password: process.env.BASIC_AUTH_PASSWORD ?? 'admin',
+    });
+    return auth(c, next);
+  });
 
-serve({
-  fetch: prodApp.fetch,
-  port,
+  // APIルートをマウント
+  prodApp.route('/', app);
+
+  // 静的ファイル配信（Viteビルド出力）
+  prodApp.use(
+    '/*',
+    serveStatic({
+      root: './dist',
+    }),
+  );
+
+  // SSRフォールバック（HTMLリクエストに対してSSRを実行）
+  prodApp.get('*', async (c) => {
+    try {
+      // 初期データを生成
+      const initialData = ssrModule.getInitialData();
+
+      // SSRでReactコンポーネントをレンダリング
+      const appHtml = ssrModule.render(initialData);
+
+      // SSR用プレースホルダーを置換
+      const html = template
+        .replace(/<!--ssr-title-->.*?<!--\/ssr-title-->/, initialData.title)
+        .replace(
+          /<!--ssr-description-->.*?<!--\/ssr-description-->/,
+          initialData.description,
+        )
+        .replace(
+          '<!--ssr-head-->',
+          `<script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script>`,
+        )
+        .replace('<!--ssr-outlet-->', appHtml);
+
+      return c.html(html);
+    } catch (error) {
+      console.error('❌ SSR Error:', error);
+      // エラー時はテンプレートをそのまま返す（CSRフォールバック）
+      return c.html(template, 500);
+    }
+  });
+
+  console.log('');
+  console.log('🚀 Playground Production Server (Self-hosted) with SSR');
+  console.log(`🌐 Application: http://localhost:${port}`);
+  console.log(`📖 Swagger UI: http://localhost:${port}/api/ui`);
+  console.log(`📄 OpenAPI JSON: http://localhost:${port}/api/doc`);
+  console.log('🔐 API認証: /api/v1/* のみ');
+  console.log('⚡ React SSR enabled');
+  console.log('');
+
+  serve(
+    {
+      fetch: prodApp.fetch,
+      port,
+    },
+    (info) => {
+      console.log(`✅ Server running at http://localhost:${info.port}`);
+    },
+  );
+};
+
+// サーバー起動
+startProductionServer().catch((err) => {
+  console.error('❌ Failed to start production server:', err);
+  process.exit(1);
 });

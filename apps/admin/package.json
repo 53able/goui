@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "tsx watch server/dev.ts",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir dist/server",
     "preview": "vite preview",
     "start": "tsx server/production.ts",
     "typecheck": "tsc --noEmit",

@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { serve } from '@hono/node-server';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { basicAuth } from 'hono/basic-auth';
@@ -103,36 +104,28 @@ const startDevServer = async () => {
       const { App } = await vite.ssrLoadModule('/src/App.tsx');
 
       // ReactコンポーネントをSSR（StrictModeで囲む）
-      // react と react-dom は直接インポート（Node.jsネイティブ）
       const appHtml = renderToString(
         createElement(StrictMode, {}, createElement(App, { initialData })),
       );
 
-      // HTMLテンプレート
-      const template = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${initialData.title}</title>
-  <meta name="description" content="${initialData.description}">
-  <script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script>
-</head>
-<body>
-  <div id="root">${appHtml}</div>
-  <script type="module" src="http://localhost:5175/src/main.tsx"></script>
-  <script type="module">
-    import RefreshRuntime from 'http://localhost:5175/@react-refresh'
-    RefreshRuntime.injectIntoGlobalHook(window)
-    window.$RefreshReg$ = () => {}
-    window.$RefreshSig$ = () => (type) => type
-    window.__vite_plugin_react_preamble_installed__ = true
-  </script>
-</body>
-</html>`;
+      // index.html を読み込み（Single Source of Truth）
+      const rawTemplate = await readFile('index.html', 'utf-8');
 
-      // ViteのHTML変換を適用（HMRクライアント注入）
-      const html = await vite.transformIndexHtml(url, template);
+      // ViteのHTML変換を適用（HMRクライアント注入、モジュールパス解決）
+      const template = await vite.transformIndexHtml(url, rawTemplate);
+
+      // SSR用プレースホルダーを置換
+      const html = template
+        .replace(/<!--ssr-title-->.*?<!--\/ssr-title-->/, initialData.title)
+        .replace(
+          /<!--ssr-description-->.*?<!--\/ssr-description-->/,
+          initialData.description,
+        )
+        .replace(
+          '<!--ssr-head-->',
+          `<script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script>`,
+        )
+        .replace('<!--ssr-outlet-->', appHtml);
 
       return c.html(html);
     } catch (error) {
@@ -143,23 +136,18 @@ const startDevServer = async () => {
         console.error(error.stack);
       }
 
-      // エラー時はクライアントサイドレンダリングにフォールバック
-      const fallbackHtml = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Playground</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="http://localhost:5175/src/main.tsx"></script>
-  <h1 style="color: red;">SSR Error (falling back to CSR)</h1>
-  <pre>${error}</pre>
-</body>
-</html>`;
-
-      return c.html(fallbackHtml, 500);
+      // エラー時はindex.htmlをそのまま返す（CSRフォールバック）
+      try {
+        const fallbackTemplate = await readFile('index.html', 'utf-8');
+        const fallbackHtml = await vite.transformIndexHtml(
+          url,
+          fallbackTemplate,
+        );
+        return c.html(fallbackHtml, 500);
+      } catch {
+        // index.html読み込みも失敗した場合の最終フォールバック
+        return c.html('<html><body><h1>Server Error</h1></body></html>', 500);
+      }
     }
   });
 

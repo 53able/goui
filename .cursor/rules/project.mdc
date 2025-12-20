@@ -16,9 +16,22 @@ alwaysApply: true
 |------|------|
 | **構成** | pnpm workspaces + Turborepo モノレポ |
 | **目的** | エンタープライズ級管理画面の高速構築 |
-| **アーキテクチャ** | React 19 + shadcn/ui + Hono |
+| **アーキテクチャ** | React 19 + Hono SSR + Vite HMR |
+| **UI** | [Shadcn Admin Kit](https://marmelab.com/shadcn-admin-kit/) + react-admin |
 
 > 📝 以下のドキュメントでは `@myorg/*` をパッケージ名のプレースホルダーとして使用。実際のプロジェクトに合わせて変更してください。
+
+---
+
+## 🏗️ SSR Architecture
+
+| 環境 | レンダリング方式 | 使用ファイル |
+|------|-----------------|-------------|
+| ローカル開発 | **SSR + HMR** | `server/dev.ts` |
+| 本番（セルフホスト） | SSR | `server/production.ts` |
+| **Vercel** | **CSR + Serverless** | `dist/` + `api/*.ts` |
+
+> 📝 詳細は `.cursor/rules/SSR-Implementation-Guide.mdc` を参照
 
 ---
 
@@ -28,17 +41,33 @@ alwaysApply: true
 project-root/
 ├── apps/
 │   ├── web/                    # @myorg/web - メインWebアプリ
-│   │   ├── src/                # フロントエンドソース
-│   │   ├── server/             # Hono APIサーバー
-│   │   ├── api/                # Vercel Edge Functions
-│   │   ├── package.json
-│   │   ├── vite.config.ts
-│   │   └── vercel.json
+│   │   ├── api/
+│   │   │   └── [[...route]].ts # Vercel Serverless Functions エントリー
+│   │   ├── server/
+│   │   │   ├── dev.ts          # 開発用SSRサーバー（Vite統合）
+│   │   │   ├── production.ts   # 本番用サーバー（セルフホスト）
+│   │   │   ├── appVercel.ts    # Vercel用Honoアプリ（軽量版）
+│   │   │   ├── app.ts          # APIルート定義
+│   │   │   └── routes/         # APIルートモジュール
+│   │   ├── src/
+│   │   │   ├── main.tsx        # クライアントエントリー（ハイドレーション）
+│   │   │   ├── entry-server.tsx # 本番SSR用エントリー
+│   │   │   ├── App.tsx         # ルートコンポーネント
+│   │   │   └── ...
+│   │   ├── index.html          # HTMLテンプレート（SSRプレースホルダー含む）
+│   │   ├── middleware.ts       # Vercel Edge Middleware（認証等）
+│   │   ├── vite.config.ts      # SSR設定を含むVite設定
+│   │   ├── vercel.json
+│   │   └── package.json
 │   │
 │   └── admin/                  # @myorg/admin - 管理画面（例）
+│       ├── api/
+│       ├── server/
 │       ├── src/
-│       ├── package.json
-│       └── vite.config.ts
+│       ├── index.html
+│       ├── middleware.ts
+│       ├── vite.config.ts
+│       └── package.json
 │
 ├── packages/
 │   ├── shared/                 # @myorg/shared - 共有スキーマ・型定義
@@ -101,8 +130,11 @@ project-root/
 | **Form** | React Hook Form | ^7.68.0 | フォーム管理 |
 | **Schema** | Zod | ^4.2.1 | スキーマバリデーション |
 | **Admin** | react-admin | ^5.13.4 | 管理画面フレームワーク |
+| **Admin** | Shadcn Admin Kit | latest | react-admin用shadcn/uiコンポーネント |
 | **Quality** | Biome | ^2.3.9 | Lint + Format |
 | **Test** | Vitest | ^4.0.16 | テスト |
+
+> 📝 **Shadcn Admin Kit**: [marmelab/shadcn-admin-kit](https://marmelab.com/shadcn-admin-kit/) - react-admin向けのshadcn/uiベースUIコンポーネントキット
 
 ### Backend (apps/web/server/)
 
@@ -244,6 +276,8 @@ export type CreateUser = z.infer<typeof CreateUserSchema>;
 ### Pattern 2: 共有UIコンポーネント（packages/ui）
 
 > 📦 **主要依存関係**: `class-variance-authority` (CVA), `clsx` + `tailwind-merge`, `sonner`, `lucide-react`, `@radix-ui/*`
+>
+> 💡 **Shadcn Admin Kit との関係**: `packages/ui` は基本的なUIコンポーネント（Button, Input等）を提供。管理画面固有のコンポーネント（DataGrid, Edit, Show等）は [Shadcn Admin Kit](https://marmelab.com/shadcn-admin-kit/) を使用。
 
 ```typescript
 // packages/ui/src/Button.tsx
@@ -306,18 +340,22 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 
 ## 🚦 Endpoints
 
-### 開発環境
+### 開発環境（SSR + HMR）
 
-| URL | アプリ | 説明 |
-|-----|--------|------|
-| `http://localhost:5173` | @myorg/web | メインWebアプリ |
-| `http://localhost:5174` | @myorg/admin | 管理画面 |
-| `http://localhost:5175` | @myorg/playground | 実験場（ライフゲームなど） |
-| `http://localhost:3000` | API (web) | バックエンドAPIサーバー |
-| `http://localhost:3000/api/ui` | API (web) | Swagger UI |
-| `http://localhost:3000/api/doc` | API (web) | OpenAPI JSON |
+> 💡 開発時は `pnpm dev:api` でSSRサーバーを起動。SSRサーバー経由でアクセスすることでSSR + HMRが有効になる。
 
-### Vercel環境（マルチプロジェクト）
+| URL | 種別 | 説明 |
+|-----|------|------|
+| `http://localhost:3000` | SSRサーバー (web) | **メインアクセスURL** - SSR + API |
+| `http://localhost:3001` | SSRサーバー (admin) | **メインアクセスURL** - SSR + API |
+| `http://localhost:3002` | SSRサーバー (playground) | **メインアクセスURL** - SSR + API |
+| `http://localhost:5173` | Vite Dev (web) | HMR用（直接アクセスはCSR） |
+| `http://localhost:5174` | Vite Dev (admin) | HMR用（直接アクセスはCSR） |
+| `http://localhost:5175` | Vite Dev (playground) | HMR用（直接アクセスはCSR） |
+| `http://localhost:300x/api/ui` | Swagger UI | OpenAPIドキュメント |
+| `http://localhost:300x/api/doc` | OpenAPI JSON | API仕様書 |
+
+### Vercel環境（CSR + Serverless）
 
 | プロジェクト | Root Directory | URL |
 |-------------|----------------|-----|
@@ -325,10 +363,15 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 | myorg-admin | `apps/admin` | `https://myorg-admin.vercel.app` |
 | myorg-playground | `apps/playground` | `https://myorg-playground.vercel.app` |
 
-> ⚠️ **Edge Runtime 制約**: Vercel Edge Runtime では `@myorg/shared`、`@hono/zod-openapi`、`@scalar/hono-api-reference` などのモジュールがサポートされません。そのため：
-> - `api/[[...route]].ts`: シンプルなインラインHonoアプリを使用
-> - `middleware.ts`: 純粋なJavaScriptで Basic認証を実装
-> - ローカル開発では `server/app.ts` の完全版APIを使用
+> ⚠️ **VercelではSSRを使用しない理由**:
+> 1. **Edge Runtime制約**: `react-dom/server` などNode.js依存モジュールが動かない
+> 2. **コスト効率**: 静的HTML + Serverless の方がスケーラブル
+> 3. **シンプルさ**: Hono公式推奨のゼロコンフィグデプロイ
+>
+> そのため：
+> - フロントエンド: `dist/` の静的ファイル（CSR）
+> - API: `api/[[...route]].ts` → `server/appVercel.ts`（軽量版）
+> - 認証: `middleware.ts`（Edge Middleware）
 
 ---
 
@@ -348,47 +391,56 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 
 ## 🆕 新しいアプリの追加方法
 
-> 📝 詳細な手順は `.cursor/commands/setup.md` を参照
+> 📝 詳細な手順は `.cursor/commands/add-app.md` を参照
 
 ### 必要なファイル一覧
 
 | ファイル | 用途 |
 |---------|------|
-| `package.json` | パッケージ定義（`@myorg/shared`, `@myorg/ui` を依存に追加） |
+| `package.json` | パッケージ定義 |
 | `tsconfig.json` | TypeScript設定（パスエイリアス `@/*` 含む） |
-| `vite.config.ts` | Viteビルド設定（ポート番号の重複に注意） |
-| `index.html` | HTMLエントリーポイント |
-| `src/index.css` | Tailwind CSS v4 設定（CSS-first config） |
-| `src/main.tsx` | Reactエントリーポイント |
-| `src/App.tsx` | ルートコンポーネント |
+| `vite.config.ts` | Viteビルド設定（**SSR設定含む**） |
+| `index.html` | HTMLテンプレート（**SSRプレースホルダー含む**） |
+| `src/index.css` | Tailwind CSS v4 設定 |
+| `src/main.tsx` | Reactエントリーポイント（**ハイドレーション対応**） |
+| `src/entry-server.tsx` | **本番SSR用エントリー** |
+| `src/App.tsx` | ルートコンポーネント（**initialData props**） |
+| `server/dev.ts` | **SSR + HMR 開発サーバー** |
+| `server/production.ts` | **本番用SSRサーバー（セルフホスト）** |
+| `server/app.ts` | APIルート定義 |
+| `server/appVercel.ts` | **Vercel用Honoアプリ（軽量版）** |
+| `api/[[...route]].ts` | Vercel Serverless Functions |
+| `middleware.ts` | Vercel Edge Middleware |
+| `vercel.json` | Vercelデプロイ設定 |
 
 ### ポート番号の割り当て
 
-| アプリ | Viteポート | APIポート |
-|--------|------------|-----------|
-| @myorg/web | 5173 | 3000 |
-| @myorg/admin | 5174 | 3001 |
-| @myorg/playground | 5175 | 3002 |
-| 新アプリ | 5176〜 | 3003〜 |
+| アプリ | SSRサーバー | Vite Dev |
+|--------|------------|----------|
+| @myorg/web | 3000 | 5173 |
+| @myorg/admin | 3001 | 5174 |
+| @myorg/playground | 3002 | 5175 |
+| 新アプリ | 3003〜 | 5176〜 |
 
 ### クイックスタート
 
 ```bash
 # 1. ディレクトリ作成
-mkdir -p apps/新アプリ/src
+mkdir -p apps/新アプリ/{src,server/routes,api}
 
-# 2. 各ファイルを作成（setup.md参照）
+# 2. 各ファイルを作成（add-app.md参照）
 
 # 3. 依存関係インストール
 pnpm install
 
-# 4. 開発サーバー起動
-pnpm --filter @myorg/新アプリ dev
+# 4. SSR開発サーバー起動
+pnpm --filter @myorg/新アプリ dev:api
 ```
 
 ### 完了チェックリスト
 
-- [ ] `http://localhost:ポート番号` でアプリが表示される
+- [ ] `http://localhost:300x`（SSRサーバー）でアプリが表示される
+- [ ] ソース変更時にHMRが動作する
 - [ ] `@myorg/ui` のコンポーネントが動作する
 - [ ] `pnpm typecheck` が通る
 - [ ] `pnpm lint` が通る
