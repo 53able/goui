@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
-  "buildCommand": "cd ../.. && pnpm turbo build --filter=@goui/playground",
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@goui/life-game",
   "installCommand": "cd ../.. && pnpm install",
   "outputDirectory": "dist",
   "framework": "vite",
