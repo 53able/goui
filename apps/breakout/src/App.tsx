@@ -19,8 +19,8 @@ interface AppProps {
 }
 
 /**
- * breakout アプリケーションのルートコンポーネント
- * @description Pancake Stack パターンでフルスクリーンレイアウト
+ * 🎄 Christmas Breakout - アプリケーションのルートコンポーネント
+ * @description 雪降る聖夜にプレゼントを届けよう！
  */
 export const App: FC<AppProps> = ({ initialData }) => {
   return (
@@ -34,11 +34,18 @@ export const App: FC<AppProps> = ({ initialData }) => {
         'px-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
       )}
     >
-      {/* ヘッダー（コンパクト） */}
-      <header className="py-2 sm:py-3 text-center">
-        <h1 className="text-xl sm:text-2xl font-bold text-primary drop-shadow-[0_0_10px_rgba(0,255,255,0.5)]">
-          {initialData?.title || 'Breakout'}
+      {/* ヘッダー（クリスマス装飾）🎄 */}
+      <header className="py-2 sm:py-3 text-center relative overflow-hidden">
+        <h1 className="text-xl sm:text-2xl font-bold text-primary drop-shadow-[0_0_10px_rgba(255,215,0,0.5)]">
+          <span className="text-red-500">🎄</span>
+          {' '}
+          {initialData?.title || 'Christmas Breakout'}
+          {' '}
+          <span className="text-green-500">🎄</span>
         </h1>
+        <p className="text-xs text-muted-foreground/60 mt-0.5">
+          ❄️ 聖夜のプレゼント大作戦 ❄️
+        </p>
       </header>
 
       {/* メインコンテンツ（フルエリア） */}
@@ -46,13 +53,13 @@ export const App: FC<AppProps> = ({ initialData }) => {
         <Breakout />
       </main>
 
-      {/* フッター */}
+      {/* フッター 🎅 */}
       <footer className="py-2 text-center text-xs text-muted-foreground">
         <span className="sm:hidden">
-          スワイプでパドル操作 • タップでスタート
+          🛷 スワイプでソリ操作 • タップでスタート
         </span>
         <span className="hidden sm:inline">
-          ← → キーでパドル操作 • スペースでスタート
+          🛷 ← → キーでソリ操作 • スペースでスタート
         </span>
       </footer>
     </div>
