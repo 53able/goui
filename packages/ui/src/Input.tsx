@@ -1,4 +1,4 @@
-import type { FC, InputHTMLAttributes } from 'react';
+import { type FC, type InputHTMLAttributes } from 'react';
 import { cn } from './utils.js';
 
 /**

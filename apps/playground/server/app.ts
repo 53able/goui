@@ -16,8 +16,8 @@ type Variables = {
 };
 
 /**
- * Honoアプリケーションインスタンス
- * @description 認証は各サーバー設定で適用
+ * Honoアプリケーションインスタンス（APIルートのみ）
+ * @description SSRロジックはdev.tsとproduction.tsで管理
  */
 const app = new OpenAPIHono<{ Variables: Variables }>();
 
@@ -44,11 +44,11 @@ app.use('*', async (c: Context<{ Variables: Variables }>, next: Next) => {
 app.use('*', cors());
 
 // Pretty JSON（開発時の可読性向上）
-app.use('*', prettyJSON());
+app.use('/api/*', prettyJSON());
 
-// ============ ルート登録 ============
+// ============ API ルート登録 ============
 
-app.route('/', healthRoutes);
+app.route('/api', healthRoutes);
 
 // ============ OpenAPI仕様 ============
 
@@ -57,7 +57,7 @@ app.doc('/api/doc', {
   info: {
     title: 'Playground API',
     version: '0.1.0',
-    description: 'ライフゲームシミュレーター',
+    description: 'ライフゲームシミュレーター API',
   },
   servers: [
     {
@@ -74,83 +74,59 @@ app.doc('/api/doc', {
 // ============ エラーハンドリング ============
 
 /**
- * 404 Not Found ハンドラー
+ * 404 Not Found ハンドラー（API専用）
  */
 app.notFound((c) => {
-  const errorResponse: ApiError = {
-    success: false,
-    error: {
-      code: 'NOT_FOUND',
-      message: `Route ${c.req.method} ${c.req.path} not found`,
-    },
-    requestId: c.get('requestId'),
-    timestamp: new Date().toISOString(),
-  };
-  return c.json(errorResponse, 404);
+  // APIルートの場合のみJSONエラーを返す
+  if (c.req.path.startsWith('/api/')) {
+    const errorResponse: ApiError = {
+      success: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: `${c.req.method} ${c.req.path} is not found`,
+      },
+      requestId: c.get('requestId'),
+      timestamp: new Date().toISOString(),
+    };
+    return c.json(errorResponse, 404);
+  }
+
+  // 非APIルートは上位でハンドリング（SSRサーバー側）
+  throw new HTTPException(404, { message: 'Page not found' });
 });
 
 /**
- * グローバルエラーハンドラー
- * @description HTTPException, ZodError, 予期しないエラーを統一形式で返す
+ * エラーハンドラー
  */
 app.onError((err, c) => {
-  const reqId = c.get('requestId');
-  const timestamp = new Date().toISOString();
+  const reqId = c.get('requestId') ?? '-';
+  console.error(`[${reqId}] Error:`, err);
 
-  // HTTPExceptionの場合
   if (err instanceof HTTPException) {
-    const errorResponse: ApiError = {
-      success: false,
-      error: {
-        code: `HTTP_${err.status}`,
-        message: err.message,
-      },
-      requestId: reqId,
-      timestamp,
-    };
-    return c.json(errorResponse, err.status);
-  }
-
-  // Zodバリデーションエラーの場合（@hono/zod-openapiが投げる）
-  if (err.name === 'ZodError' && 'issues' in err) {
-    const zodError = err as {
-      issues: Array<{ path: (string | number)[]; message: string }>;
-    };
-    const errorResponse: ApiError = {
-      success: false,
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: 'リクエストのバリデーションに失敗しました',
-        details: {
-          issues: zodError.issues.map((issue) => ({
-            path: issue.path.join('.'),
-            message: issue.message,
-          })),
+    if (c.req.path.startsWith('/api/')) {
+      const errorResponse: ApiError = {
+        success: false,
+        error: {
+          code: 'HTTP_ERROR',
+          message: err.message,
         },
-      },
-      requestId: reqId,
-      timestamp,
-    };
-    return c.json(errorResponse, 400);
+        requestId: reqId,
+        timestamp: new Date().toISOString(),
+      };
+      return c.json(errorResponse, err.status);
+    }
   }
 
-  // 予期しないエラー
-  console.error(`[${reqId}] Unhandled error:`, err);
-  const errorResponse: ApiError = {
-    success: false,
-    error: {
-      code: 'INTERNAL_SERVER_ERROR',
-      message:
-        process.env.NODE_ENV === 'production'
-          ? 'Internal server error'
-          : err.message,
-    },
-    requestId: reqId,
-    timestamp,
-  };
-  return c.json(errorResponse, 500);
+  // APIルート以外のエラーは上位でハンドリング
+  throw err;
 });
 
-export type AppType = typeof app;
+/**
+ * APIルートのみをエクスポート（dev.tsで使用）
+ */
+export const apiRoutes = healthRoutes;
+
+/**
+ * 完全なアプリケーション（production.tsで使用）
+ */
 export { app };
-export default app;

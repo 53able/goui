@@ -1,0 +1,488 @@
+# Hono + Vite SSR 実装ガイド
+
+> React 19 + Hono + Vite による本格的なSSR（Server-Side Rendering）実装の完全ガイド
+
+---
+
+## 🎯 このガイドの目的
+
+モノレポ構成のReactアプリケーションに、以下を実現するSSRを実装する：
+
+- **SSR（サーバーサイドレンダリング）**: 初回ロード高速化、SEO対応
+- **HMR（ホットモジュールリプレースメント）**: ファイル変更を即座に反映
+- **Fast Refresh**: React状態を保持したまま更新
+- **ハイドレーション**: クライアント側でインタラクティブに
+
+---
+
+## 🏗️ アーキテクチャ
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      ブラウザ (Client)                           │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│  GET /        │   │ GET /src/*.tsx│   │ WebSocket HMR │
+│  (HTML要求)    │   │ (JS要求)      │   │ (変更通知)     │
+└───────┬───────┘   └───────┬───────┘   └───────┬───────┘
+        │                   │                   │
+        ▼                   │                   │
+┌───────────────────────────┴───────────────────┴───────┐
+│              Hono SSR サーバー (:3002)                 │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │  vite.ssrLoadModule() でReactコンポーネント読込   │  │
+│  │  renderToString() でHTML生成                    │  │
+│  │  Viteアセットへのプロキシ                        │  │
+│  └─────────────────────────────────────────────────┘  │
+└───────────────────────────┬───────────────────────────┘
+                            │
+                            ▼
+┌───────────────────────────────────────────────────────┐
+│              Vite Dev サーバー (:5175)                 │
+│  ┌─────────────────────────────────────────────────┐  │
+│  │  TypeScript/JSX変換                             │  │
+│  │  HMR WebSocket管理                              │  │
+│  │  React Fast Refresh                            │  │
+│  └─────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────┘
+```
+
+### フロー詳細
+
+1. **初回アクセス** (`GET /`)
+   - Hono SSRサーバーがリクエストを受信
+   - `vite.ssrLoadModule`でReactコンポーネントをロード
+   - `renderToString`でHTMLを生成
+   - 初期データを`window.__INITIAL_DATA__`に注入
+   - 完全なHTMLをクライアントに返却
+
+2. **クライアント側**
+   - SSRされたHTMLを即座に表示
+   - `main.tsx`がロードされ`hydrateRoot`を実行
+   - Reactがハイドレーションで接続
+   - 完全にインタラクティブなアプリに
+
+3. **HMR（開発時）**
+   - Vite dev serverがファイル変更を検知
+   - WebSocket経由でクライアントに通知
+   - React Fast Refreshで状態を保持したまま更新
+
+---
+
+## 📁 必要なファイル構成
+
+```
+apps/{app-name}/
+├── server/
+│   ├── dev.ts          # 開発用SSRサーバー（Vite統合）
+│   ├── production.ts   # 本番用サーバー
+│   └── app.ts          # APIルート定義
+├── src/
+│   ├── main.tsx        # クライアントエントリー（ハイドレーション）
+│   ├── App.tsx         # ルートコンポーネント
+│   └── ...
+├── vite.config.ts      # SSR設定を含むVite設定
+├── package.json
+└── tsconfig.json
+```
+
+---
+
+## 🔧 実装手順
+
+### Step 1: vite.config.ts にSSR設定を追加
+
+```typescript
+import { resolve } from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [
+    react({
+      jsxRuntime: 'automatic',
+      include: /\.(tsx?|jsx?)$/,
+      exclude: /node_modules/,
+    }),
+    tailwindcss(),
+  ],
+  resolve: {
+    alias: {
+      '@': resolve(import.meta.dirname, './src'),
+    },
+  },
+  server: {
+    port: 5175, // アプリごとに変更
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3002', // APIサーバーポート
+        changeOrigin: true,
+      },
+    },
+  },
+  // ⬇️ SSR設定（重要！）
+  ssr: {
+    // react と react-dom はNode.jsネイティブで処理（CommonJS互換）
+    external: ['react', 'react-dom'],
+  },
+  build: {
+    manifest: true,
+    ssrManifest: true,
+    outDir: 'dist',
+  },
+});
+```
+
+### Step 2: server/dev.ts を実装
+
+```typescript
+import { serve } from '@hono/node-server';
+import { OpenAPIHono } from '@hono/zod-openapi';
+import { basicAuth } from 'hono/basic-auth';
+import { createElement, StrictMode } from 'react';
+import { renderToString } from 'react-dom/server';
+import { createServer as createViteServer, type ViteDevServer } from 'vite';
+import { apiRoutes } from './app.js';
+
+// グローバルなViteインスタンス
+let vite: ViteDevServer;
+
+/**
+ * Viteインスタンスを作成
+ */
+const createVite = async () => {
+  vite = await createViteServer({
+    server: {
+      middlewareMode: false,
+      port: 5175, // アプリごとに変更
+      hmr: { port: 5175 },
+    },
+    appType: 'custom',
+  });
+  await vite.listen();
+  return vite;
+};
+
+/**
+ * 開発サーバーを起動
+ */
+const startDevServer = async () => {
+  const port = Number(process.env.API_PORT) || 3002;
+
+  // Vite dev serverを起動
+  console.log('🔧 Starting Vite dev server...');
+  await createVite();
+  console.log('✅ Vite dev server ready');
+
+  // Honoアプリを作成
+  const app = new OpenAPIHono();
+
+  // API認証（必要に応じて）
+  app.use(
+    '/api/v1/*',
+    basicAuth({
+      username: process.env.BASIC_AUTH_USERNAME ?? 'admin',
+      password: process.env.BASIC_AUTH_PASSWORD ?? 'admin',
+    }),
+  );
+
+  // APIルートをマウント
+  app.route('/api', apiRoutes);
+
+  // Vite関連アセットをプロキシ
+  const VITE_PROXY_PATHS = [
+    '/src/*',
+    '/@vite/*',
+    '/@fs/*',
+    '/@id/*',
+    '/@react-refresh',
+    '/node_modules/*',
+  ];
+
+  for (const path of VITE_PROXY_PATHS) {
+    app.use(path, async (c) => {
+      const url = new URL(c.req.url);
+      const viteUrl = `http://localhost:5175${url.pathname}${url.search}`;
+      const res = await fetch(viteUrl);
+      return new Response(res.body, {
+        status: res.status,
+        headers: res.headers,
+      });
+    });
+  }
+
+  // React SSRエンドポイント
+  app.get('*', async (c) => {
+    try {
+      // 初期データを生成
+      const initialData = {
+        title: 'App Title',
+        description: 'App Description',
+        timestamp: new Date().toISOString(),
+      };
+
+      // ViteでReactコンポーネントをロード
+      const { App } = await vite.ssrLoadModule('/src/App.tsx');
+
+      // ReactコンポーネントをSSR
+      const appHtml = renderToString(
+        createElement(StrictMode, {}, createElement(App, { initialData })),
+      );
+
+      // HTMLテンプレート
+      const template = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${initialData.title}</title>
+  <meta name="description" content="${initialData.description}">
+  <script>window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};</script>
+</head>
+<body>
+  <div id="root">${appHtml}</div>
+  <script type="module" src="http://localhost:5175/src/main.tsx"></script>
+  <script type="module">
+    import RefreshRuntime from 'http://localhost:5175/@react-refresh'
+    RefreshRuntime.injectIntoGlobalHook(window)
+    window.$RefreshReg$ = () => {}
+    window.$RefreshSig$ = () => (type) => type
+    window.__vite_plugin_react_preamble_installed__ = true
+  </script>
+</body>
+</html>`;
+
+      // ViteのHTML変換を適用
+      const html = await vite.transformIndexHtml(c.req.url, template);
+      return c.html(html);
+    } catch (error) {
+      if (error instanceof Error) {
+        vite.ssrFixStacktrace(error);
+        console.error('❌ SSR Error:', error.message);
+      }
+      // エラー時はCSRにフォールバック
+      return c.html(`<html><body><div id="root"></div>
+        <script type="module" src="http://localhost:5175/src/main.tsx"></script>
+      </body></html>`, 500);
+    }
+  });
+
+  serve({ fetch: app.fetch, port });
+};
+
+startDevServer();
+```
+
+### Step 3: src/main.tsx を実装（ハイドレーション対応）
+
+```typescript
+import { StrictMode } from 'react';
+import { createRoot, hydrateRoot } from 'react-dom/client';
+import { App } from './App';
+import './index.css';
+
+/**
+ * サーバーから注入された初期データの型定義
+ */
+interface InitialData {
+  title: string;
+  description: string;
+  timestamp: string;
+}
+
+declare global {
+  interface Window {
+    __INITIAL_DATA__?: InitialData;
+  }
+}
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error('Root element not found');
+}
+
+// サーバーから注入された初期データを取得
+const initialData = window.__INITIAL_DATA__ || {
+  title: 'Default Title',
+  description: 'Default Description',
+  timestamp: new Date().toISOString(),
+};
+
+const appElement = (
+  <StrictMode>
+    <App initialData={initialData} />
+  </StrictMode>
+);
+
+// SSRされたHTMLがある場合はハイドレーション
+if (rootElement.hasChildNodes()) {
+  console.log('🔄 Hydrating React app...');
+  try {
+    hydrateRoot(rootElement, appElement);
+    console.log('✅ Hydration successful!');
+  } catch (error) {
+    console.error('❌ Hydration failed:', error);
+    // フォールバック
+    rootElement.innerHTML = '';
+    createRoot(rootElement).render(appElement);
+  }
+} else {
+  console.log('⚡ Rendering React app...');
+  createRoot(rootElement).render(appElement);
+}
+```
+
+### Step 4: src/App.tsx で初期データを受け取る
+
+```typescript
+import type { FC } from 'react';
+
+interface AppProps {
+  initialData?: {
+    title: string;
+    description: string;
+    timestamp: string;
+  };
+}
+
+export const App: FC<AppProps> = ({ initialData }) => {
+  return (
+    <div>
+      <h1>{initialData?.title || 'My App'}</h1>
+      <p>Rendered at: {initialData?.timestamp}</p>
+      {/* アプリのコンテンツ */}
+    </div>
+  );
+};
+```
+
+### Step 5: server/app.ts を簡素化（APIルートのみ）
+
+```typescript
+import { OpenAPIHono } from '@hono/zod-openapi';
+import { healthRoutes } from './routes/health.js';
+
+const app = new OpenAPIHono();
+
+// ミドルウェア設定
+// ...
+
+// APIルートのみ登録
+app.route('/api', healthRoutes);
+
+// エラーハンドリング
+// ...
+
+// APIルートをエクスポート
+export const apiRoutes = healthRoutes;
+export { app };
+```
+
+### Step 6: packages/ui のコンポーネントにReactをインポート
+
+SSR環境では、JSXを使用するファイルで明示的にReactをインポートする必要がある：
+
+```typescript
+// packages/ui/src/Button.tsx
+// biome-ignore lint/correctness/noUnusedImports: SSRでJSXを使用するために必要
+import React, { type ButtonHTMLAttributes, type FC } from 'react';
+
+// ... コンポーネント実装
+```
+
+---
+
+## 🔍 トラブルシューティング
+
+### エラー: `@vitejs/plugin-react can't detect preamble`
+
+**原因**: ViteのReactプラグインがFast Refresh用のpreambleを検出できない
+
+**解決策**:
+1. `vite.config.ts`で`include`と`exclude`を設定
+2. HTMLテンプレートにpreambleスクリプトを追加：
+```html
+<script type="module">
+  import RefreshRuntime from 'http://localhost:5175/@react-refresh'
+  RefreshRuntime.injectIntoGlobalHook(window)
+  window.$RefreshReg$ = () => {}
+  window.$RefreshSig$ = () => (type) => type
+  window.__vite_plugin_react_preamble_installed__ = true
+</script>
+```
+
+### エラー: `require is not defined`
+
+**原因**: `react-dom/server`をViteの`ssrLoadModule`で読み込もうとしている
+
+**解決策**:
+1. `vite.config.ts`で`ssr.external`を設定：
+```typescript
+ssr: {
+  external: ['react', 'react-dom'],
+}
+```
+2. `dev.ts`で`react`と`react-dom`を直接インポート
+
+### エラー: `React is not defined` (SSR時)
+
+**原因**: JSXファイルでReactがグローバルに参照されている
+
+**解決策**: 共有UIパッケージ内のJSXファイルで明示的にReactをインポート
+
+### ハイドレーション不一致
+
+**原因**: サーバーとクライアントでレンダリング結果が異なる
+
+**解決策**:
+1. 両方で同じ`StrictMode`設定を使用
+2. 初期データを`window.__INITIAL_DATA__`経由で一致させる
+3. 日付など動的な値はサーバーで生成してクライアントに渡す
+
+---
+
+## 📊 ポート番号の割り当て
+
+| アプリ | SSRサーバー | Vite Dev |
+|-------|-----------|----------|
+| web | 3000 | 5173 |
+| admin | 3001 | 5174 |
+| playground | 3002 | 5175 |
+| 新アプリ | 3003〜 | 5176〜 |
+
+---
+
+## ✅ チェックリスト
+
+SSRを実装する際のチェックリスト：
+
+- [ ] `vite.config.ts`に`ssr.external`設定を追加
+- [ ] `server/dev.ts`でVite統合SSRサーバーを実装
+- [ ] `src/main.tsx`でハイドレーション対応
+- [ ] `src/App.tsx`で`initialData`プロップスを受け取る
+- [ ] 共有UIパッケージで明示的にReactをインポート
+- [ ] HTMLテンプレートにpreambleスクリプトを追加
+- [ ] `window.__INITIAL_DATA__`で初期データを注入
+- [ ] エラーハンドリングでCSRフォールバックを実装
+
+---
+
+## 🚀 起動コマンド
+
+```bash
+# 開発サーバー起動（SSR + HMR）
+pnpm --filter @goui/{app-name} dev:api
+```
+
+---
+
+## 📚 参考リンク
+
+- [Vite SSR Guide](https://vite.dev/guide/ssr.html)
+- [React 19 Server APIs](https://react.dev/reference/react-dom/server)
+- [Hono Documentation](https://hono.dev/)
