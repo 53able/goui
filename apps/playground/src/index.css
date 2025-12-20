@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 /* ============================================
+   Base Styles - テキスト色のデフォルト設定
+   ============================================ */
+body {
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+/* ============================================
    Life Game - Mobile First CSS
    ============================================ */
 

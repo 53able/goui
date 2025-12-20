@@ -25,7 +25,7 @@ interface AppProps {
  */
 export const App: FC<AppProps> = ({ initialData }) => {
   return (
-    <div className={cn('min-h-screen bg-background')}>
+    <div className={cn('min-h-screen bg-background text-foreground')}>
       {/* SSRデバッグ情報（開発環境のみ表示） */}
       {process.env.NODE_ENV === 'development' && initialData && (
         <div className="fixed top-0 right-0 m-4 p-4 bg-black/80 text-white text-xs rounded shadow-lg max-w-xs">

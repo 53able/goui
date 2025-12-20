@@ -165,7 +165,7 @@ export const LifeGame: FC = () => {
   }, [toggleRunning, step, reset, clear, isRunning]);
 
   return (
-    <div className="app-layout bg-background">
+    <div className="app-layout bg-background text-foreground">
       {/* メインコンテンツ - Gentle Flex パターン */}
       <main className="flex flex-col items-center justify-center gap-4 p-4 sm:gap-6 sm:p-6">
         {/* ヘッダー */}
