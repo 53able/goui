@@ -5,7 +5,9 @@
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
   "outputDirectory": "dist",
   "framework": "vite",
-  "regions": ["hnd1"],
+  "regions": [
+    "hnd1"
+  ],
   "rewrites": [
     {
       "source": "/health",
