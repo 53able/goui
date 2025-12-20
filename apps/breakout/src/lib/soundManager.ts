@@ -1,7 +1,7 @@
 /**
  * ゲームサウンドマネージャー
  * Web Audio APIを使用したシンセサイザーベースの効果音
- * 
+ *
  * ⚠️ SSR対応: AudioContextはクライアントサイドでのみ初期化
  */
 
@@ -16,16 +16,20 @@ let audioContext: AudioContext | null = null;
  */
 const getAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') return null;
-  
+
   if (!audioContext) {
     try {
-      audioContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+      audioContext = new (
+        window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext
+      )();
     } catch {
       console.warn('Web Audio API is not supported');
       return null;
     }
   }
-  
+
   return audioContext;
 };
 
@@ -55,7 +59,10 @@ export const playHitSound = (pitch = 1.0): void => {
   const osc = ctx.createOscillator();
   osc.type = 'square';
   osc.frequency.setValueAtTime(800 * pitch, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(200 * pitch, ctx.currentTime + 0.1);
+  osc.frequency.exponentialRampToValueAtTime(
+    200 * pitch,
+    ctx.currentTime + 0.1,
+  );
 
   // ゲイン（音量エンベロープ）
   const gain = ctx.createGain();
@@ -168,7 +175,10 @@ export const playGameOverSound = (): void => {
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.5, ctx.currentTime + 0.5);
+    osc.frequency.exponentialRampToValueAtTime(
+      freq * 0.5,
+      ctx.currentTime + 0.5,
+    );
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.15, ctx.currentTime);
@@ -191,7 +201,7 @@ export const playVictorySound = (): void => {
   if (!ctx) return;
 
   // 勝利のメロディ（ドミソド）
-  const melody = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+  const melody = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
   const durations = [0.15, 0.15, 0.15, 0.3];
 
   let time = ctx.currentTime;
@@ -307,4 +317,3 @@ export const playItemSound = (): void => {
     osc2.stop(time + 0.1);
   }
 };
-

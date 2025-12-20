@@ -1,6 +1,6 @@
 import {
-  HighScoreDataSchema,
   type HighScoreData,
+  HighScoreDataSchema,
   type HighScoreEntry,
 } from '@/schemas/breakout';
 
@@ -128,4 +128,3 @@ export const resetHighScores = (): void => {
 export const getTopScore = (data: HighScoreData): number => {
   return data.scores[0]?.score ?? 0;
 };
-

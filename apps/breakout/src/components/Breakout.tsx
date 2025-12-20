@@ -1,9 +1,9 @@
 import { Button, cn } from '@goui/ui';
 import { type FC, useMemo } from 'react';
-import { useBreakoutStore } from '@/stores/breakoutStore';
-import { P5Canvas } from './P5Canvas';
 import { createBreakoutSketch } from '@/lib/breakoutSketch';
 import { getTopScore } from '@/lib/highScoreStorage';
+import { useBreakoutStore } from '@/stores/breakoutStore';
+import { P5Canvas } from './P5Canvas';
 
 /**
  * ブロック崩しゲームコンポーネント 🎄 クリスマスエディション
@@ -119,7 +119,7 @@ export const Breakout: FC = () => {
                   : 'text-red-400 drop-shadow-[0_0_20px_rgba(255,0,0,0.5)]',
               )}
             >
-              {gameState === 'victory'
+{gameState === 'victory'
                 ? '🎄 Merry Christmas! 🎄'
                 : '⛄ また挑戦してね！'}
             </h2>
