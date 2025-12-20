@@ -43,20 +43,29 @@ const appElement = (
   </StrictMode>
 );
 
-// SSRされたHTMLがある場合（rootに子要素がある）はハイドレーション
-// そうでない場合は通常のレンダリング
-if (rootElement.hasChildNodes()) {
+/**
+ * SSRされたHTMLが実際に存在するか判定
+ * @description hasChildNodes() は空白やコメントも含むため、
+ * 実際のElement子要素の存在を確認する
+ */
+const hasSSRContent = (): boolean => {
+  // Element要素（空白やコメントを除く）が存在するかチェック
+  const hasElementChildren = rootElement.children.length > 0;
+  // または、サーバーから初期データが注入されているか
+  const hasInitialData = typeof window.__INITIAL_DATA__ !== 'undefined';
+  return hasElementChildren || hasInitialData;
+};
+
+// SSRされたHTMLがある場合はハイドレーション
+// そうでない場合は通常のレンダリング（CSR）
+if (hasSSRContent()) {
   console.log('🔄 Hydrating React app...');
-  try {
-    hydrateRoot(rootElement, appElement);
-    console.log('✅ Hydration successful!');
-  } catch (error) {
-    console.error('❌ Hydration failed:', error);
-    // ハイドレーション失敗時はcreateRootにフォールバック
-    rootElement.innerHTML = '';
-    createRoot(rootElement).render(appElement);
-  }
+  hydrateRoot(rootElement, appElement, {
+    onRecoverableError: (error) => {
+      console.error('⚠️ Hydration recoverable error:', error);
+    },
+  });
 } else {
-  console.log('⚡ Rendering React app...');
+  console.log('⚡ Rendering React app (CSR)...');
   createRoot(rootElement).render(appElement);
 }
