@@ -19,6 +19,11 @@ const MAX_SCORES = 10;
  * @returns ハイスコアデータ（存在しない場合は空配列）
  */
 export const loadHighScores = (): HighScoreData => {
+  // SSR時はlocalStorageが存在しないため空配列を返す
+  if (typeof window === 'undefined') {
+    return { scores: [] };
+  }
+
   try {
     const json = localStorage.getItem(STORAGE_KEY);
     if (!json) {
@@ -46,6 +51,11 @@ export const loadHighScores = (): HighScoreData => {
  * @param data - ハイスコアデータ
  */
 export const saveHighScores = (data: HighScoreData): void => {
+  // SSR時は何もしない
+  if (typeof window === 'undefined') {
+    return;
+  }
+
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
@@ -113,6 +123,11 @@ export const addHighScore = (
  * ハイスコアデータを初期化（テスト・デバッグ用）
  */
 export const resetHighScores = (): void => {
+  // SSR時は何もしない
+  if (typeof window === 'undefined') {
+    return;
+  }
+
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (error) {
