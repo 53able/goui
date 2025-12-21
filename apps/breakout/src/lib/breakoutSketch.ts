@@ -380,6 +380,7 @@ export const createBreakoutSketch = (): P5Sketch => {
 
     /**
      * ブロック破壊を検出
+     * @description パフォーマンス最適化: 破壊数のカウントを効率化、エフェクトを制限
      */
     const detectBrickDestruction = (
       game: ReturnType<typeof useBreakoutStore.getState>['game'],
@@ -395,53 +396,72 @@ export const createBreakoutSketch = (): P5Sketch => {
       ball: { x: number; y: number },
       config: { brickRows: number },
     ): void => {
-      const currentBricksCount = bricks.filter((b) => !b.destroyed).length;
+      // 破壊数を効率的にカウント（reduceで1回のループ）
+      let currentBricksCount = 0;
+      for (const b of bricks) {
+        if (!b.destroyed) currentBricksCount++;
+      }
 
-      if (currentBricksCount < prevBricksCount && game.state === 'playing') {
+      const destroyedCount = prevBricksCount - currentBricksCount;
+
+      if (destroyedCount > 0 && game.state === 'playing') {
         const now = Date.now();
         if (now - effects.combo.lastHitTime < 1500) {
-          effects.combo.count++;
+          effects.combo.count += destroyedCount; // 複数破壊時はコンボを加算
         } else {
-          effects.combo.count = 1;
+          effects.combo.count = destroyedCount;
         }
         effects.combo.lastHitTime = now;
 
-        // サウンド再生
-        const pitch = 0.8 + effects.combo.count * 0.1;
+        // サウンド再生（スロットリングされるので頻繁に呼んでもOK）
+        const pitch = 0.8 + Math.min(effects.combo.count * 0.08, 0.8);
         playHitSound(pitch);
         if (effects.combo.count > 1) {
           playComboSound(effects.combo.count);
         }
 
-        // 破壊されたブロックのエフェクト
+        // 破壊されたブロックのエフェクト（最大3つまで）
+        let effectCount = 0;
+        const maxEffects = 3;
+
         for (const brick of bricks) {
+          if (effectCount >= maxEffects) break;
+
           if (brick.destroyed) {
             const cx = brick.x + brick.width / 2;
             const cy = brick.y + brick.height / 2;
             const dist = Math.sqrt((ball.x - cx) ** 2 + (ball.y - cy) ** 2);
-            if (dist < 100) {
+            if (dist < 120) {
+              // パーティクル数を固定値に（コンボで増やさない）
               spawnParticles(
                 p,
                 effects.particles,
                 cx,
                 cy,
                 brick.color,
-                15 + effects.combo.count * 5,
+                10,
               );
               spawnShockwave(effects.shockwaves, cx, cy, brick.color);
-              const baseScore = (config.brickRows - brick.row) * 10;
-              spawnScorePopup(
-                effects.scorePopups,
-                cx,
-                cy,
-                baseScore,
-                effects.combo.count,
-              );
-              triggerShake(effects, 3 + effects.combo.count);
-              break;
+
+              // 最初の1つだけスコアポップアップ
+              if (effectCount === 0) {
+                const baseScore = (config.brickRows - brick.row) * 10 * destroyedCount;
+                spawnScorePopup(
+                  effects.scorePopups,
+                  cx,
+                  cy,
+                  baseScore,
+                  effects.combo.count,
+                );
+              }
+
+              effectCount++;
             }
           }
         }
+
+        // シェイクは1回だけ（強度は破壊数に応じて）
+        triggerShake(effects, Math.min(3 + destroyedCount, 8));
       }
       prevBricksCount = currentBricksCount;
     };

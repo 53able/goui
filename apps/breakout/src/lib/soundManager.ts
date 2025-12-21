@@ -21,6 +21,25 @@ let audioContext: AudioContext | null = null;
 let sleighNoiseBuffer: AudioBuffer | null = null;
 
 /**
+ * サウンドスロットリング設定
+ * @description 同時再生数を制限してパフォーマンス低下を防ぐ
+ */
+const SOUND_THROTTLE = {
+  /** ヒットサウンドの最小間隔（ms） */
+  hitCooldown: 30,
+  /** コンボサウンドの最小間隔（ms） */
+  comboCooldown: 100,
+  /** アイテムサウンドの最小間隔（ms） */
+  itemCooldown: 50,
+  /** 最後のヒットサウンド再生時刻 */
+  lastHitTime: 0,
+  /** 最後のコンボサウンド再生時刻 */
+  lastComboTime: 0,
+  /** 最後のアイテムサウンド再生時刻 */
+  lastItemTime: 0,
+};
+
+/**
  * AudioContextを取得（遅延初期化）
  */
 const getAudioContext = (): AudioContext | null => {
@@ -315,10 +334,17 @@ export const isSoundEnabled = (): boolean => soundEnabled;
 /**
  * ブロック破壊音（ピコッ！キラン✨）
  * ファミコン風ベル音 + スレイベル
+ * @description スロットリング適用で同時再生数を制限
  * @param pitch - ピッチ調整（0.5-2.0）
  */
 export const playHitSound = (pitch = 1.0): void => {
   if (!soundEnabled) return;
+
+  // スロットリング: クールダウン中はスキップ
+  const now = Date.now();
+  if (now - SOUND_THROTTLE.lastHitTime < SOUND_THROTTLE.hitCooldown) return;
+  SOUND_THROTTLE.lastHitTime = now;
+
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -332,24 +358,31 @@ export const playHitSound = (pitch = 1.0): void => {
 /**
  * コンボ音（ピコピコピコ！シャンシャン！）
  * 上昇アルペジオ + スレイベル
+ * @description スロットリング適用で同時再生数を制限
  * @param comboCount - コンボ数（ピッチに影響）
  */
 export const playComboSound = (comboCount: number): void => {
   if (!soundEnabled) return;
+
+  // スロットリング: クールダウン中はスキップ
+  const now = Date.now();
+  if (now - SOUND_THROTTLE.lastComboTime < SOUND_THROTTLE.comboCooldown) return;
+  SOUND_THROTTLE.lastComboTime = now;
+
   const ctx = getAudioContext();
   if (!ctx) return;
 
   const basePitch = Math.min(523.25 + comboCount * 50, 1046.5);
 
-  // ファミコン風上昇アルペジオ（C-E-G-C）
-  const notes = [basePitch, basePitch * 1.25, basePitch * 1.5, basePitch * 2];
+  // ファミコン風上昇アルペジオ（C-E-G-C）- 音数を削減
+  const notes = [basePitch, basePitch * 1.5, basePitch * 2];
 
   for (let i = 0; i < notes.length; i++) {
-    playChipBell(ctx, notes[i], 0.1, 0.12, ctx.currentTime + i * 0.04);
+    playChipBell(ctx, notes[i], 0.08, 0.1, ctx.currentTime + i * 0.05);
   }
 
-  // スレイベル
-  playSleighPattern(ctx, 4, 0.04, 0.08);
+  // スレイベル（回数削減）
+  playSleighPattern(ctx, 2, 0.05, 0.06);
 };
 
 /**
@@ -506,20 +539,27 @@ export const playStartSound = (): void => {
 /**
  * アイテム取得音（シャカシャカ！キラキラ✨）
  * スレイベル + 高音アルペジオ
+ * @description スロットリング適用で同時再生数を制限
  */
 export const playItemSound = (): void => {
   if (!soundEnabled) return;
+
+  // スロットリング: クールダウン中はスキップ
+  const now = Date.now();
+  if (now - SOUND_THROTTLE.lastItemTime < SOUND_THROTTLE.itemCooldown) return;
+  SOUND_THROTTLE.lastItemTime = now;
+
   const ctx = getAudioContext();
   if (!ctx) return;
 
-  // スレイベルメイン
-  playSleighPattern(ctx, 6, 0.03, 0.15);
+  // スレイベル（回数削減）
+  playSleighPattern(ctx, 3, 0.04, 0.12);
 
-  // 高音キラキラアルペジオ（オクターブ上）
-  const sparkles = [1046.5, 1318.51, 1567.98, 2093]; // C6, E6, G6, C7
+  // 高音キラキラアルペジオ（音数削減）
+  const sparkles = [1046.5, 1567.98, 2093]; // C6, G6, C7
 
   for (let i = 0; i < sparkles.length; i++) {
-    playChipBell(ctx, sparkles[i], 0.08, 0.08, ctx.currentTime + i * 0.04);
+    playChipBell(ctx, sparkles[i], 0.06, 0.07, ctx.currentTime + i * 0.05);
   }
 };
 
