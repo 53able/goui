@@ -32,9 +32,9 @@ export const Breakout: FC = () => {
   const sketch = useMemo(() => createBreakoutSketch(), []);
 
   return (
-    <div className="flex flex-col items-center gap-2 w-full flex-1 min-h-0 max-w-2xl px-2">
+    <div className="flex flex-col items-center gap-2 w-full flex-1 min-h-0 h-full px-2">
       {/* スコアとライフ 🎄 */}
-      <div className="flex justify-between items-center w-full max-w-[min(100%,50vh*0.625)]">
+      <div className="flex justify-between items-center w-full">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-3">
             <span className="text-2xl sm:text-3xl font-bold text-primary drop-shadow-[0_0_10px_rgba(255,215,0,0.5)]">
@@ -61,7 +61,7 @@ export const Breakout: FC = () => {
       </div>
 
       {/* p5.jsキャンバス + オーバーレイ (aspect-ratio: 5/8 = 400/640) */}
-      <div className="relative flex-1 min-h-0 w-auto aspect-5/8">
+      <div className="relative flex-1 min-h-0 w-auto h-full aspect-5/8">
         <P5Canvas
           sketch={sketch}
           className={cn(

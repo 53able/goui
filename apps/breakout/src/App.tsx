@@ -49,7 +49,7 @@ export const App: FC<AppProps> = ({ initialData }) => {
       </header>
 
       {/* メインコンテンツ（フルエリア） */}
-      <main className="grid place-content-start justify-center overflow-hidden">
+      <main className="flex justify-center items-start overflow-hidden w-full">
         <Breakout />
       </main>
 
