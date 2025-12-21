@@ -27,7 +27,7 @@ export const App: FC<AppProps> = ({ initialData }) => {
     <div
       className={cn(
         // Pancake Stack: Header(auto) + Main(1fr) + Footer(auto)
-        'min-h-svh bg-background text-foreground',
+        'h-svh bg-background text-foreground',
         'grid grid-rows-[auto_1fr_auto]',
         // Safe Area対応
         'pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
@@ -49,7 +49,7 @@ export const App: FC<AppProps> = ({ initialData }) => {
       </header>
 
       {/* メインコンテンツ（フルエリア） */}
-      <main className="grid place-items-center overflow-hidden">
+      <main className="grid place-content-start justify-center overflow-hidden">
         <Breakout />
       </main>
 

@@ -32,7 +32,7 @@ export const Breakout: FC = () => {
   const sketch = useMemo(() => createBreakoutSketch(), []);
 
   return (
-    <div className="flex flex-col items-center gap-2 w-full h-full max-w-2xl px-2">
+    <div className="flex flex-col items-center gap-2 w-full flex-1 min-h-0 max-w-2xl px-2">
       {/* スコアとライフ 🎄 */}
       <div className="flex justify-between items-center w-full max-w-[min(100%,50vh*0.625)]">
         <div className="flex flex-col gap-0.5">
@@ -60,8 +60,8 @@ export const Breakout: FC = () => {
         </div>
       </div>
 
-      {/* p5.jsキャンバス + オーバーレイ */}
-      <div className="relative h-full max-h-[70vh] w-auto">
+      {/* p5.jsキャンバス + オーバーレイ (aspect-ratio: 5/8 = 400/640) */}
+      <div className="relative flex-1 min-h-0 w-auto aspect-5/8">
         <P5Canvas
           sketch={sketch}
           className={cn(
@@ -78,24 +78,24 @@ export const Breakout: FC = () => {
         {gameState === 'levelClear' && (
           <div
             className={cn(
-              'absolute inset-0 flex flex-col items-center justify-center',
+              'absolute inset-0 flex flex-col items-center justify-center px-4',
               'bg-[#0f1930]/80 rounded-xl backdrop-blur-sm',
               'animate-in fade-in duration-300',
             )}
           >
-            <h2 className="text-4xl sm:text-5xl font-black text-yellow-400 drop-shadow-[0_0_20px_rgba(255,215,0,0.8)] mb-4 animate-pulse">
+            <h2 className="text-2xl sm:text-4xl font-black text-yellow-400 drop-shadow-[0_0_20px_rgba(255,215,0,0.8)] mb-4 animate-pulse text-center whitespace-nowrap">
               🎁 LEVEL {gameLevel} CLEAR! 🎁
             </h2>
-            <p className="text-xl text-white mb-2">
+            <p className="text-lg sm:text-xl text-white mb-2">
               SCORE:{' '}
               <span className="text-yellow-400 font-bold">
                 {gameScore.toLocaleString()}
               </span>
             </p>
-            <p className="text-lg text-green-300 mb-4">
+            <p className="text-base sm:text-lg text-green-300 mb-4 text-center">
               🎄 次のレベル: もっとたくさんのプレゼント!
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground text-center">
               スペースキーまたはスタートボタンで次のレベルへ
             </p>
           </div>
@@ -105,7 +105,7 @@ export const Breakout: FC = () => {
         {(gameState === 'gameOver' || gameState === 'victory') && (
           <div
             className={cn(
-              'absolute inset-0 flex flex-col items-center justify-center',
+              'absolute inset-0 flex flex-col items-center justify-center px-4',
               'bg-[#0f1930]/85 rounded-xl backdrop-blur-sm',
               'animate-in fade-in duration-300',
             )}
@@ -113,26 +113,26 @@ export const Breakout: FC = () => {
             {/* タイトル */}
             <h2
               className={cn(
-                'text-4xl sm:text-5xl font-black mb-4',
+                'text-2xl sm:text-4xl font-black mb-4 text-center whitespace-nowrap',
                 gameState === 'victory'
                   ? 'text-yellow-400 drop-shadow-[0_0_20px_rgba(255,215,0,0.8)]'
                   : 'text-red-400 drop-shadow-[0_0_20px_rgba(255,0,0,0.5)]',
               )}
             >
-{gameState === 'victory'
+              {gameState === 'victory'
                 ? '🎄 Merry Christmas! 🎄'
                 : '⛄ また挑戦してね！'}
             </h2>
 
             {/* 最終レベル表示（完全勝利時） */}
             {gameState === 'victory' && (
-              <p className="text-lg text-yellow-300 mb-2">
+              <p className="text-sm sm:text-lg text-yellow-300 mb-2 text-center">
                 🌟 全レベルクリア！素敵なクリスマスを！ 🌟
               </p>
             )}
 
             {/* スコア */}
-            <p className="text-2xl text-white mb-2">
+            <p className="text-xl sm:text-2xl text-white mb-2">
               SCORE:{' '}
               <span className="text-yellow-400 font-bold">
                 {gameScore.toLocaleString()}
@@ -141,7 +141,7 @@ export const Breakout: FC = () => {
 
             {/* 到達レベル表示（ゲームオーバー時） */}
             {gameState === 'gameOver' && (
-              <p className="text-sm text-muted-foreground mb-2">
+              <p className="text-xs sm:text-sm text-muted-foreground mb-2">
                 🎁 到達レベル: {gameLevel}
               </p>
             )}
@@ -154,10 +154,10 @@ export const Breakout: FC = () => {
                   'animate-bounce',
                 )}
               >
-                <span className="text-xl text-yellow-300 font-bold tracking-wide">
+                <span className="text-lg sm:text-xl text-yellow-300 font-bold tracking-wide">
                   🌟 NEW RECORD! 🌟
                 </span>
-                <span className="text-lg text-yellow-400/90">
+                <span className="text-sm sm:text-lg text-yellow-400/90 text-center">
                   {newRecordRank === 1
                     ? '⭐ 歴代1位！最高のプレゼント！'
                     : `🎁 ランキング ${newRecordRank}位にランクイン！`}
@@ -166,7 +166,7 @@ export const Breakout: FC = () => {
             )}
 
             {/* リプレイ案内 */}
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-2 text-center">
               スペースキーまたはスタートボタンで再プレイ
             </p>
           </div>
