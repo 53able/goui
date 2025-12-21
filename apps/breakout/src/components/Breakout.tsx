@@ -32,9 +32,9 @@ export const Breakout: FC = () => {
   const sketch = useMemo(() => createBreakoutSketch(), []);
 
   return (
-    <div className="flex flex-col items-center gap-2 w-full flex-1 min-h-0 h-full px-2">
+    <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full flex-1 min-h-0 h-full px-2">
       {/* スコアとライフ 🎄 */}
-      <div className="flex justify-between items-center w-full">
+      <div className="flex justify-between items-center w-full flex-shrink-0">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-3">
             <span className="text-2xl sm:text-3xl font-bold text-primary drop-shadow-[0_0_10px_rgba(255,215,0,0.5)]">
@@ -61,7 +61,7 @@ export const Breakout: FC = () => {
       </div>
 
       {/* p5.jsキャンバス + オーバーレイ (aspect-ratio: 5/8 = 400/640) */}
-      <div className="relative flex-1 min-h-0 w-auto h-full aspect-5/8">
+      <div className="relative flex-1 min-h-0 max-h-full w-auto aspect-5/8">
         <P5Canvas
           sketch={sketch}
           className={cn(
@@ -174,13 +174,13 @@ export const Breakout: FC = () => {
       </div>
 
       {/* ボタン 🎄 */}
-      <div className="flex gap-3 justify-center">
+      <div className="flex gap-2 sm:gap-3 justify-center flex-shrink-0">
         <Button
           onClick={() => (gameState === 'playing' ? pause() : start())}
           variant={gameState === 'playing' ? 'outline' : 'default'}
           size="lg"
           className={cn(
-            'min-w-[120px] h-11 text-base',
+            'min-w-[100px] sm:min-w-[120px] h-10 sm:h-11 text-sm sm:text-base',
             'active:scale-95 transition-transform',
             'shadow-[0_0_15px_rgba(255,215,0,0.2)]',
             gameState !== 'playing' && 'bg-red-700 hover:bg-red-600 text-white',
@@ -198,15 +198,15 @@ export const Breakout: FC = () => {
           onClick={reset}
           variant="outline"
           size="lg"
-          className="min-w-[120px] h-11 text-base active:scale-95 transition-transform border-yellow-600/50 text-yellow-500 hover:bg-yellow-950/30"
+          className="min-w-[100px] sm:min-w-[120px] h-10 sm:h-11 text-sm sm:text-base active:scale-95 transition-transform border-yellow-600/50 text-yellow-500 hover:bg-yellow-950/30"
         >
           🔄 リセット
         </Button>
       </div>
 
       {/* 操作説明 */}
-      <div className="text-center text-xs text-muted-foreground/60 mt-1">
-        <p>🛷 マウス/タッチでソリ操作 | ←→キー | スペースで発射</p>
+      <div className="text-center text-xs text-muted-foreground/60 flex-shrink-0">
+        <p className="hidden sm:block">🛷 マウス/タッチでソリ操作 | ←→キー | スペースで発射</p>
         <p className="text-yellow-500/50">✨ Christmas Edition ✨</p>
       </div>
     </div>

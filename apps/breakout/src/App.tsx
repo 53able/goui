@@ -35,26 +35,26 @@ export const App: FC<AppProps> = ({ initialData }) => {
       )}
     >
       {/* ヘッダー（クリスマス装飾）🎄 */}
-      <header className="py-2 sm:py-3 text-center relative overflow-hidden">
-        <h1 className="text-xl sm:text-2xl font-bold text-primary drop-shadow-[0_0_10px_rgba(255,215,0,0.5)]">
+      <header className="py-1.5 sm:py-2 text-center relative overflow-hidden flex-shrink-0">
+        <h1 className="text-lg sm:text-2xl font-bold text-primary drop-shadow-[0_0_10px_rgba(255,215,0,0.5)]">
           <span className="text-red-500">🎄</span>
           {' '}
           {initialData?.title || 'Christmas Breakout'}
           {' '}
           <span className="text-green-500">🎄</span>
         </h1>
-        <p className="text-xs text-muted-foreground/60 mt-0.5">
+        <p className="text-xs text-muted-foreground/60 mt-0.5 hidden sm:block">
           ❄️ 聖夜のプレゼント大作戦 ❄️
         </p>
       </header>
 
       {/* メインコンテンツ（フルエリア） */}
-      <main className="flex justify-center items-start overflow-hidden w-full">
+      <main className="flex justify-center items-start overflow-hidden w-full min-h-0">
         <Breakout />
       </main>
 
       {/* フッター 🎅 */}
-      <footer className="py-2 text-center text-xs text-muted-foreground">
+      <footer className="py-1.5 sm:py-2 text-center text-xs text-muted-foreground flex-shrink-0">
         <span className="sm:hidden">
           🛷 スワイプでソリ操作 • タップでスタート
         </span>
