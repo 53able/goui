@@ -245,7 +245,25 @@ VERCEL_ORG_ID=$ORG_ID VERCEL_PROJECT_ID=$PROJECT_ID vercel deploy --prod --yes
 
 各アプリディレクトリで個別にリンクする方法。
 
-#### @myorg/web のデプロイ
+#### 方法A: ルートから `--cwd` オプションで実行（推奨）
+
+ルートディレクトリから各アプリを個別にリンク・デプロイする方法。ディレクトリを移動せずに操作できる。
+
+```bash
+# Step 1: 各アプリをVercelプロジェクトにリンク（初回のみ）
+vercel link --cwd apps/breakout --project=breakout --yes
+vercel link --cwd apps/tetris --project=tetris --yes
+vercel link --cwd apps/life-game --project=life-game --yes
+vercel link --cwd apps/admin --project=admin --yes
+
+# Step 2: デプロイ
+vercel --cwd apps/breakout --yes        # プレビューデプロイ
+vercel --cwd apps/breakout --prod --yes # 本番デプロイ
+```
+
+> ⚠️ **注意**: ルートに `.vercel/project.json` は不要。各アプリディレクトリ（`apps/xxx/.vercel/`）にのみ作成される。
+
+#### 方法B: 各ディレクトリに移動して実行
 
 ```bash
 # Vercel CLIのインストール（未インストールの場合）
