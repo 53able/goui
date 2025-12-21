@@ -447,13 +447,25 @@ export const createBreakoutSketch = (): P5Sketch => {
     };
 
     /**
+     * CSSスケーリングを考慮したマウス座標をゲーム座標に変換
+     */
+    const getScaledMouseX = (): number => {
+      const config = useBreakoutStore.getState().game.config;
+      const canvas = p.canvas as HTMLCanvasElement;
+      const rect = canvas.getBoundingClientRect();
+      // 表示サイズと論理サイズの比率でスケーリング
+      const scale = rect.width / config.canvasWidth;
+      return p.mouseX / scale;
+    };
+
+    /**
      * マウス移動
      */
     p.mouseMoved = () => {
       const game = useBreakoutStore.getState().game;
       if (game.state !== 'playing' && game.state !== 'ready') return;
 
-      const targetX = p.mouseX;
+      const targetX = getScaledMouseX();
       useBreakoutStore.getState().handlePointerMove(targetX, 0, 1);
     };
 
@@ -464,7 +476,7 @@ export const createBreakoutSketch = (): P5Sketch => {
       const game = useBreakoutStore.getState().game;
       if (game.state !== 'playing' && game.state !== 'ready') return;
 
-      const targetX = p.mouseX;
+      const targetX = getScaledMouseX();
       useBreakoutStore.getState().handlePointerMove(targetX, 0, 1);
       return false; // デフォルト動作を防止
     };
