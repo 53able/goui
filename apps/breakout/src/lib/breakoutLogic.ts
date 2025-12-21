@@ -539,6 +539,99 @@ const updateBallPhysics = (
 };
 
 /**
+ * ボール同士の衝突判定
+ * @param ball1 - ボール1
+ * @param ball2 - ボール2
+ * @returns 衝突しているか
+ */
+const checkBallCollision = (ball1: Ball, ball2: Ball): boolean => {
+  const dx = ball2.x - ball1.x;
+  const dy = ball2.y - ball1.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const minDistance = ball1.radius + ball2.radius;
+  return distance < minDistance;
+};
+
+/**
+ * ボール同士の弾性衝突を処理（質量が等しい場合）
+ * @description 運動量保存則に基づいて速度ベクトルを更新
+ * @param ball1 - ボール1
+ * @param ball2 - ボール2
+ * @returns 衝突後の2つのボール
+ */
+const resolveBallCollision = (
+  ball1: Ball,
+  ball2: Ball,
+): { ball1: Ball; ball2: Ball } => {
+  // 中心間のベクトル
+  const dx = ball2.x - ball1.x;
+  const dy = ball2.y - ball1.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+
+  // 衝突していない or 重なりすぎ → 処理しない
+  if (distance === 0 || distance > ball1.radius + ball2.radius) {
+    return { ball1, ball2 };
+  }
+
+  // 正規化された衝突法線ベクトル
+  const nx = dx / distance;
+  const ny = dy / distance;
+
+  // 相対速度
+  const dvx = ball1.velocity.x - ball2.velocity.x;
+  const dvy = ball1.velocity.y - ball2.velocity.y;
+
+  // 法線方向の相対速度（内積）
+  const dvn = dvx * nx + dvy * ny;
+
+  // 離れていく方向なら衝突しない
+  if (dvn >= 0) {
+    return { ball1, ball2 };
+  }
+
+  // 質量が等しい場合の弾性衝突: 法線方向の速度成分を交換
+  const impulse = dvn; // 質量が等しいので単純化
+
+  const newBall1 = {
+    ...ball1,
+    velocity: {
+      x: ball1.velocity.x - impulse * nx,
+      y: ball1.velocity.y - impulse * ny,
+    },
+  };
+
+  const newBall2 = {
+    ...ball2,
+    velocity: {
+      x: ball2.velocity.x + impulse * nx,
+      y: ball2.velocity.y + impulse * ny,
+    },
+  };
+
+  // ボールが重なっている場合、位置を補正
+  const overlap = ball1.radius + ball2.radius - distance;
+  if (overlap > 0) {
+    const separationX = (overlap / 2) * nx;
+    const separationY = (overlap / 2) * ny;
+
+    return {
+      ball1: {
+        ...newBall1,
+        x: newBall1.x - separationX,
+        y: newBall1.y - separationY,
+      },
+      ball2: {
+        ...newBall2,
+        x: newBall2.x + separationX,
+        y: newBall2.y + separationY,
+      },
+    };
+  }
+
+  return { ball1: newBall1, ball2: newBall2 };
+};
+
+/**
  * ボールとブロックの衝突を処理
  * @returns 更新後のボール、ブロック、破壊位置
  */
@@ -655,6 +748,36 @@ export const updateGame = (game: BreakoutGame): BreakoutGame => {
     newBricks = collision.bricks;
     newScore += collision.scoreGained;
     allDestroyedPositions.push(...collision.destroyedPositions);
+  }
+
+  // === ボール同士の衝突処理 ===
+  // メインボールが生きていて、追加ボールがある場合のみ処理
+  if (!mainBallFell && survivingExtraBalls.length > 0) {
+    // メインボール vs 各追加ボール
+    for (let i = 0; i < survivingExtraBalls.length; i++) {
+      if (checkBallCollision(newMainBall, survivingExtraBalls[i])) {
+        const resolved = resolveBallCollision(
+          newMainBall,
+          survivingExtraBalls[i],
+        );
+        newMainBall = resolved.ball1;
+        survivingExtraBalls[i] = resolved.ball2;
+      }
+    }
+
+    // 追加ボール同士の衝突（全ペアチェック）
+    for (let i = 0; i < survivingExtraBalls.length; i++) {
+      for (let j = i + 1; j < survivingExtraBalls.length; j++) {
+        if (checkBallCollision(survivingExtraBalls[i], survivingExtraBalls[j])) {
+          const resolved = resolveBallCollision(
+            survivingExtraBalls[i],
+            survivingExtraBalls[j],
+          );
+          survivingExtraBalls[i] = resolved.ball1;
+          survivingExtraBalls[j] = resolved.ball2;
+        }
+      }
+    }
   }
 
   // === メインボールが落ちた場合の処理 ===
