@@ -86,6 +86,8 @@ export const createBreakoutSketch = (): P5Sketch => {
      */
     p.setup = () => {
       const config = useBreakoutStore.getState().game.config;
+      
+      // 初期キャンバスサイズを設定
       p.createCanvas(config.canvasWidth, config.canvasHeight, p.WEBGL);
       p.pixelDensity(1);
 
@@ -103,6 +105,44 @@ export const createBreakoutSketch = (): P5Sketch => {
     };
 
     /**
+     * ウィンドウリサイズ時の処理
+     * @description アスペクト比5:8を保ちながら親要素に収まる最大サイズにリサイズ
+     */
+    p.windowResized = () => {
+      const config = useBreakoutStore.getState().game.config;
+      
+      // 親要素のサイズを取得（P5Canvasから渡される）
+      const containerWidth = p._containerWidth || config.canvasWidth;
+      const containerHeight = p._containerHeight || config.canvasHeight;
+      
+      // ゲームのアスペクト比（5:8 = 0.625）
+      const gameAspect = config.canvasWidth / config.canvasHeight;
+      const containerAspect = containerWidth / containerHeight;
+      
+      let newWidth: number;
+      let newHeight: number;
+      
+      // コンテナのアスペクト比がゲームより横長の場合、高さ基準でリサイズ
+      if (containerAspect > gameAspect) {
+        newHeight = containerHeight;
+        newWidth = newHeight * gameAspect;
+      } else {
+        // コンテナのアスペクト比がゲームより縦長の場合、幅基準でリサイズ
+        newWidth = containerWidth;
+        newHeight = newWidth / gameAspect;
+      }
+      
+      // WebGLモードではresizeCanvasで自動的にビューポートも調整される
+      // 論理座標系（400x640）からキャンバス座標系への変換はp5が自動で行う
+      p.resizeCanvas(newWidth, newHeight);
+      
+      // UIバッファは論理座標系のまま（固定サイズ）
+      if (uiBuffer) {
+        uiBuffer.resizeCanvas(config.canvasWidth, config.canvasHeight);
+      }
+    };
+
+    /**
      * 描画ループ
      */
     p.draw = () => {
@@ -112,6 +152,10 @@ export const createBreakoutSketch = (): P5Sketch => {
 
       // 時間を更新
       time += p.deltaTime * 0.001;
+
+      // キャンバスサイズに応じたスケーリング係数（論理座標系400x640を維持）
+      const scaleX = p.width / config.canvasWidth;
+      const scaleY = p.height / config.canvasHeight;
 
       // ===== 状態変化検出 =====
       detectStateChanges(game);
@@ -134,6 +178,10 @@ export const createBreakoutSketch = (): P5Sketch => {
 
       // ===== 3D描画開始 =====
       p.push();
+      
+      // スケーリングを適用
+      p.scale(scaleX, scaleY, 1);
+      
       p.translate(effects.shake.x, effects.shake.y, 0);
 
       // 背景 🎄 クリスマス仕様
@@ -302,9 +350,13 @@ export const createBreakoutSketch = (): P5Sketch => {
         drawReadyScreen(uiBuffer, p, config.canvasWidth, config.canvasHeight);
       }
 
-      // UIバッファを描画
+      // UIバッファを描画（スケーリングを維持）
       p.push();
-      p.resetMatrix();
+      
+      // スケーリングを適用
+      p.scale(scaleX, scaleY, 1);
+      
+      // 論理座標系の中心を原点に移動
       p.translate(-config.canvasWidth / 2, -config.canvasHeight / 2, 100);
       p.image(uiBuffer, 0, 0);
       p.pop();
@@ -467,15 +519,14 @@ export const createBreakoutSketch = (): P5Sketch => {
     };
 
     /**
-     * CSSスケーリングを考慮したマウス座標をゲーム座標に変換
+     * キャンバス座標をゲーム論理座標に変換
+     * @description キャンバスがリサイズされても論理座標系（400x640）は固定
      */
-    const getScaledMouseX = (): number => {
+    const getGameX = (): number => {
       const config = useBreakoutStore.getState().game.config;
-      const canvas = p.canvas as HTMLCanvasElement;
-      const rect = canvas.getBoundingClientRect();
-      // 表示サイズと論理サイズの比率でスケーリング
-      const scale = rect.width / config.canvasWidth;
-      return p.mouseX / scale;
+      // キャンバスサイズに対する論理座標の比率
+      const scaleX = config.canvasWidth / p.width;
+      return p.mouseX * scaleX;
     };
 
     /**
@@ -485,7 +536,7 @@ export const createBreakoutSketch = (): P5Sketch => {
       const game = useBreakoutStore.getState().game;
       if (game.state !== 'playing' && game.state !== 'ready') return;
 
-      const targetX = getScaledMouseX();
+      const targetX = getGameX();
       useBreakoutStore.getState().handlePointerMove(targetX, 0, 1);
     };
 
@@ -496,7 +547,7 @@ export const createBreakoutSketch = (): P5Sketch => {
       const game = useBreakoutStore.getState().game;
       if (game.state !== 'playing' && game.state !== 'ready') return;
 
-      const targetX = getScaledMouseX();
+      const targetX = getGameX();
       useBreakoutStore.getState().handlePointerMove(targetX, 0, 1);
       return false; // デフォルト動作を防止
     };
