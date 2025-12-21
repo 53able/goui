@@ -1,39 +1,45 @@
 @import "tailwindcss";
 
 @theme {
-  /* ブロック崩しらしいレトロなカラースキーム */
-  --color-background: hsl(230 25% 10%);
+  /* 🎄 クリスマスカラースキーム */
+  --color-background: hsl(220 40% 8%);  /* 冬の夜空 */
   --color-foreground: hsl(0 0% 98%);
-  --color-muted-foreground: hsl(215 20% 65%);
-  --color-primary: hsl(180 100% 50%);
-  --color-primary-foreground: hsl(230 25% 10%);
-  --color-accent: hsl(320 100% 60%);
+  --color-muted-foreground: hsl(200 20% 70%);
+  
+  /* メインカラー: クリスマスゴールド */
+  --color-primary: hsl(43 100% 55%);
+  --color-primary-foreground: hsl(220 40% 8%);
+  
+  /* アクセント: クリスマスレッド */
+  --color-accent: hsl(0 85% 50%);
   --color-accent-foreground: hsl(0 0% 98%);
 
-  /* ゲーム用カスタムカラー */
-  --color-paddle: hsl(180 100% 50%);
-  --color-ball: hsl(45 100% 60%);
-  --color-brick-1: hsl(0 80% 55%);
-  --color-brick-2: hsl(30 90% 55%);
-  --color-brick-3: hsl(60 90% 55%);
-  --color-brick-4: hsl(120 70% 50%);
-  --color-brick-5: hsl(180 80% 50%);
-  --color-brick-6: hsl(270 70% 60%);
+  /* ゲーム用クリスマスカラー */
+  --color-paddle: hsl(0 70% 40%);  /* サンタの赤 */
+  --color-ball: hsl(43 100% 60%);  /* 金のオーナメント */
+  
+  /* プレゼントカラー */
+  --color-brick-1: hsl(0 80% 45%);    /* クリスマスレッド */
+  --color-brick-2: hsl(140 60% 35%);  /* クリスマスグリーン */
+  --color-brick-3: hsl(43 100% 50%);  /* ゴールド */
+  --color-brick-4: hsl(0 0% 95%);     /* シルバーホワイト */
+  --color-brick-5: hsl(340 80% 50%);  /* ピンクレッド */
+  --color-brick-6: hsl(160 50% 40%);  /* ダークグリーン */
 }
 
 @media (prefers-color-scheme: light) {
   @theme {
-    --color-background: hsl(220 15% 95%);
-    --color-foreground: hsl(230 25% 10%);
-    --color-muted-foreground: hsl(215 16% 47%);
-    --color-primary: hsl(180 100% 35%);
+    --color-background: hsl(200 30% 95%);  /* 雪の白 */
+    --color-foreground: hsl(220 40% 15%);
+    --color-muted-foreground: hsl(200 20% 40%);
+    --color-primary: hsl(0 80% 45%);  /* ライトモードはレッドをメイン */
     --color-primary-foreground: hsl(0 0% 100%);
   }
 }
 
 /* ゲームキャンバス用のスタイル */
 canvas {
-  image-rendering: pixelated;
+  image-rendering: auto;  /* クリスマスの柔らかさを出すためautoに */
 }
 
 /* iOS Safe Area対応 */
@@ -64,4 +70,22 @@ canvas {
 button {
   -webkit-touch-callout: none;
   user-select: none;
+}
+
+/* 🎅 クリスマス装飾用アニメーション */
+@keyframes snowfall {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 5px currentColor); }
+  50% { filter: drop-shadow(0 0 20px currentColor); }
 }

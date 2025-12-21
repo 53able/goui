@@ -1,6 +1,6 @@
 /**
- * ボール描画モジュール
- * @description メインボールと追加ボールで共通利用
+ * ボール描画モジュール 🎄 クリスマス仕様
+ * @description クリスマスオーナメント（赤＋金）として描画
  */
 
 import type { P5Instance } from '@/components/P5Canvas';
@@ -17,12 +17,12 @@ export interface DrawBallOptions {
   isPiercing?: boolean;
   /** 現在時間（アニメーション用） */
   time?: number;
-  /** グリッチ効果の強さ */
+  /** グリッチ効果の強さ（クリスマス版では控えめに使用） */
   glitchChromatic?: number;
 }
 
 /**
- * ボールを描画（3D球体 + グロー効果）
+ * クリスマスオーナメント（ボール）を描画 🔮
  * メインボールと追加ボールで共通利用可能
  *
  * @param p - p5インスタンス
@@ -43,62 +43,42 @@ export const drawBall = (
     spawnPulse = 1,
     isPiercing = false,
     time = 0,
-    glitchChromatic = 0,
   } = options;
 
   const effectiveRadius = radius * spawnScale * spawnPulse;
 
-  // ボールのグロー（外側から描画）- 黄色/オレンジ系
-  // 最外層グロー（大きく薄い）
+  // 外側のグロー（金色）✨
   p.push();
   p.translate(x, y, 15);
   p.noStroke();
-  p.fill(255, 200, 50, 40 * spawnScale);
+  p.fill(255, 215, 0, 40 * spawnScale);
   p.sphere(effectiveRadius * 2.5);
   p.pop();
 
-  // 中間グロー
+  // 中間グロー（暖かいオレンジ）
   p.push();
   p.translate(x, y, 18);
   p.noStroke();
-  p.fill(255, 220, 80, 80 * spawnScale);
+  p.fill(255, 180, 80, 80 * spawnScale);
   p.sphere(effectiveRadius * 1.8);
   p.pop();
 
-  // 内側グロー
-  p.push();
-  p.translate(x, y, 20);
-  p.noStroke();
-  p.fill(255, 240, 150, 120 * spawnScale);
-  p.sphere(effectiveRadius * 1.3);
-  p.pop();
-
-  // ボールの色収差（グリッチ時）
-  if (glitchChromatic > 0.5) {
-    p.push();
-    p.translate(x - glitchChromatic * 2, y, 22);
-    p.noStroke();
-    p.fill(255, 100, 50, 150);
-    p.sphere(effectiveRadius * 1.1);
-    p.pop();
-
-    p.push();
-    p.translate(x + glitchChromatic * 2, y, 22);
-    p.noStroke();
-    p.fill(255, 50, 100, 150);
-    p.sphere(effectiveRadius * 1.1);
-    p.pop();
-  }
-
-  // ボール本体（黄色🟡）
+  // オーナメント本体（クリスマスレッド or 金）🎄
   p.push();
   p.translate(x, y, 25);
   p.noStroke();
-  p.fill(255, 220, 50); // 鮮やかな黄色
+
+  if (isPiercing) {
+    // 貫通時は金色に輝く ⭐
+    p.fill(255, 215, 0);
+  } else {
+    // 通常時はクリスマスレッド ❤️
+    p.fill(200, 30, 30);
+  }
   p.sphere(effectiveRadius);
   p.pop();
 
-  // ボールハイライト（白く光る）
+  // ハイライト（白く光る）
   p.push();
   p.translate(x - 2, y - 2, 25 + effectiveRadius * 0.7);
   p.fill(255, 255, 255, 230 * spawnScale);
@@ -106,34 +86,47 @@ export const drawBall = (
   p.sphere(effectiveRadius * 0.35);
   p.pop();
 
-  // ボールリング（アウトライン効果）
+  // オーナメントのキャップ（金色）🔔
+  p.push();
+  p.translate(x, y - effectiveRadius - 3, 25);
+  p.fill(255, 215, 0);
+  p.noStroke();
+  p.box(6, 6, 6);
+  p.pop();
+
+  // 装飾ライン（金色の帯）
   p.push();
   p.translate(x, y, 25);
   p.noFill();
-  p.stroke(255, 255, 200, 200 * spawnScale);
+  p.stroke(255, 215, 0, 200 * spawnScale);
   p.strokeWeight(2);
-  p.ellipse(0, 0, effectiveRadius * 2.2, effectiveRadius * 2.2);
+  p.rotateX(0.3);
+  p.ellipse(0, 0, effectiveRadius * 2, effectiveRadius * 0.5);
   p.pop();
 
-  // 貫通ボールエフェクト（炎のオーラ）
+  // 貫通ボールエフェクト（星のオーラ）⭐
   if (isPiercing) {
-    p.push();
-    p.translate(x, y, 20);
-    // 炎のようなオーラ
-    for (let i = 0; i < 8; i++) {
-      const flameAngle = time * 5 + i * (p.TWO_PI / 8);
-      const flameOffset = p.sin(time * 10 + i) * 3;
+    for (let i = 0; i < 6; i++) {
+      const starAngle = time * 4 + i * (p.TWO_PI / 6);
+      const starOffset = Math.sin(time * 8 + i) * 3;
       p.push();
       p.translate(
-        p.cos(flameAngle) * (radius + 5 + flameOffset),
-        p.sin(flameAngle) * (radius + 5 + flameOffset),
-        0,
+        x + Math.cos(starAngle) * (radius + 8 + starOffset),
+        y + Math.sin(starAngle) * (radius + 8 + starOffset),
+        25,
       );
+      p.rotateZ(time * 3);
       p.noStroke();
-      p.fill(255, 100 + p.sin(time * 15 + i) * 50, 50, 200);
-      p.sphere(4);
+      p.fill(255, 255, 200, 200);
+      // 小さな星
+      p.beginShape();
+      for (let j = 0; j < 10; j++) {
+        const a = (j / 10) * p.TWO_PI;
+        const r = j % 2 === 0 ? 5 : 2;
+        p.vertex(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      p.endShape(p.CLOSE);
       p.pop();
     }
-    p.pop();
   }
 };

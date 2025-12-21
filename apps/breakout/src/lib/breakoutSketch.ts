@@ -86,6 +86,8 @@ export const createBreakoutSketch = (): P5Sketch => {
      */
     p.setup = () => {
       const config = useBreakoutStore.getState().game.config;
+      
+      // 初期キャンバスサイズを設定
       p.createCanvas(config.canvasWidth, config.canvasHeight, p.WEBGL);
       p.pixelDensity(1);
 
@@ -103,6 +105,44 @@ export const createBreakoutSketch = (): P5Sketch => {
     };
 
     /**
+     * ウィンドウリサイズ時の処理
+     * @description アスペクト比5:8を保ちながら親要素に収まる最大サイズにリサイズ
+     */
+    p.windowResized = () => {
+      const config = useBreakoutStore.getState().game.config;
+      
+      // 親要素のサイズを取得（P5Canvasから渡される）
+      const containerWidth = p._containerWidth || config.canvasWidth;
+      const containerHeight = p._containerHeight || config.canvasHeight;
+      
+      // ゲームのアスペクト比（5:8 = 0.625）
+      const gameAspect = config.canvasWidth / config.canvasHeight;
+      const containerAspect = containerWidth / containerHeight;
+      
+      let newWidth: number;
+      let newHeight: number;
+      
+      // コンテナのアスペクト比がゲームより横長の場合、高さ基準でリサイズ
+      if (containerAspect > gameAspect) {
+        newHeight = containerHeight;
+        newWidth = newHeight * gameAspect;
+      } else {
+        // コンテナのアスペクト比がゲームより縦長の場合、幅基準でリサイズ
+        newWidth = containerWidth;
+        newHeight = newWidth / gameAspect;
+      }
+      
+      // WebGLモードではresizeCanvasで自動的にビューポートも調整される
+      // 論理座標系（400x640）からキャンバス座標系への変換はp5が自動で行う
+      p.resizeCanvas(newWidth, newHeight);
+      
+      // UIバッファは論理座標系のまま（固定サイズ）
+      if (uiBuffer) {
+        uiBuffer.resizeCanvas(config.canvasWidth, config.canvasHeight);
+      }
+    };
+
+    /**
      * 描画ループ
      */
     p.draw = () => {
@@ -112,6 +152,10 @@ export const createBreakoutSketch = (): P5Sketch => {
 
       // 時間を更新
       time += p.deltaTime * 0.001;
+
+      // キャンバスサイズに応じたスケーリング係数（論理座標系400x640を維持）
+      const scaleX = p.width / config.canvasWidth;
+      const scaleY = p.height / config.canvasHeight;
 
       // ===== 状態変化検出 =====
       detectStateChanges(game);
@@ -134,16 +178,23 @@ export const createBreakoutSketch = (): P5Sketch => {
 
       // ===== 3D描画開始 =====
       p.push();
+      
+      // スケーリングを適用
+      p.scale(scaleX, scaleY, 1);
+      
       p.translate(effects.shake.x, effects.shake.y, 0);
 
-      // 背景
+      // 背景 🎄 クリスマス仕様
       drawBackground(
         p,
         effects.stars,
         effects.scanlines,
+        effects.snowflakes,
+        effects.christmasLights,
         effects.glitch,
         config.canvasWidth,
         config.canvasHeight,
+        time,
       );
 
       // ブロック
@@ -176,7 +227,7 @@ export const createBreakoutSketch = (): P5Sketch => {
       // パドル
       drawPaddle(p, paddle, config.canvasWidth, config.canvasHeight);
 
-      // ボール出現演出
+      // ボール出現演出 🎄
       if (effects.ballSpawnEffect && !effects.ballSpawnEffect.completed) {
         drawBallSpawnEffect(
           p,
@@ -185,6 +236,7 @@ export const createBreakoutSketch = (): P5Sketch => {
           ball.y,
           config.canvasWidth,
           config.canvasHeight,
+          time,
         );
       }
 
@@ -298,9 +350,13 @@ export const createBreakoutSketch = (): P5Sketch => {
         drawReadyScreen(uiBuffer, p, config.canvasWidth, config.canvasHeight);
       }
 
-      // UIバッファを描画
+      // UIバッファを描画（スケーリングを維持）
       p.push();
-      p.resetMatrix();
+      
+      // スケーリングを適用
+      p.scale(scaleX, scaleY, 1);
+      
+      // 論理座標系の中心を原点に移動
       p.translate(-config.canvasWidth / 2, -config.canvasHeight / 2, 100);
       p.image(uiBuffer, 0, 0);
       p.pop();
@@ -376,6 +432,7 @@ export const createBreakoutSketch = (): P5Sketch => {
 
     /**
      * ブロック破壊を検出
+     * @description パフォーマンス最適化: 破壊数のカウントを効率化、エフェクトを制限
      */
     const detectBrickDestruction = (
       game: ReturnType<typeof useBreakoutStore.getState>['game'],
@@ -391,55 +448,85 @@ export const createBreakoutSketch = (): P5Sketch => {
       ball: { x: number; y: number },
       config: { brickRows: number },
     ): void => {
-      const currentBricksCount = bricks.filter((b) => !b.destroyed).length;
+      // 破壊数を効率的にカウント（reduceで1回のループ）
+      let currentBricksCount = 0;
+      for (const b of bricks) {
+        if (!b.destroyed) currentBricksCount++;
+      }
 
-      if (currentBricksCount < prevBricksCount && game.state === 'playing') {
+      const destroyedCount = prevBricksCount - currentBricksCount;
+
+      if (destroyedCount > 0 && game.state === 'playing') {
         const now = Date.now();
         if (now - effects.combo.lastHitTime < 1500) {
-          effects.combo.count++;
+          effects.combo.count += destroyedCount; // 複数破壊時はコンボを加算
         } else {
-          effects.combo.count = 1;
+          effects.combo.count = destroyedCount;
         }
         effects.combo.lastHitTime = now;
 
-        // サウンド再生
-        const pitch = 0.8 + effects.combo.count * 0.1;
+        // サウンド再生（スロットリングされるので頻繁に呼んでもOK）
+        const pitch = 0.8 + Math.min(effects.combo.count * 0.08, 0.8);
         playHitSound(pitch);
         if (effects.combo.count > 1) {
           playComboSound(effects.combo.count);
         }
 
-        // 破壊されたブロックのエフェクト
+        // 破壊されたブロックのエフェクト（最大3つまで）
+        let effectCount = 0;
+        const maxEffects = 3;
+
         for (const brick of bricks) {
+          if (effectCount >= maxEffects) break;
+
           if (brick.destroyed) {
             const cx = brick.x + brick.width / 2;
             const cy = brick.y + brick.height / 2;
             const dist = Math.sqrt((ball.x - cx) ** 2 + (ball.y - cy) ** 2);
-            if (dist < 100) {
+            if (dist < 120) {
+              // パーティクル数を固定値に（コンボで増やさない）
               spawnParticles(
                 p,
                 effects.particles,
                 cx,
                 cy,
                 brick.color,
-                15 + effects.combo.count * 5,
+                10,
               );
               spawnShockwave(effects.shockwaves, cx, cy, brick.color);
-              const baseScore = (config.brickRows - brick.row) * 10;
-              spawnScorePopup(
-                effects.scorePopups,
-                cx,
-                cy,
-                baseScore,
-                effects.combo.count,
-              );
-              triggerShake(effects, 3 + effects.combo.count);
-              break;
+
+              // 最初の1つだけスコアポップアップ
+              if (effectCount === 0) {
+                const baseScore = (config.brickRows - brick.row) * 10 * destroyedCount;
+                spawnScorePopup(
+                  effects.scorePopups,
+                  cx,
+                  cy,
+                  baseScore,
+                  effects.combo.count,
+                );
+              }
+
+              effectCount++;
             }
           }
         }
+
+        // シェイクは1回だけ（強度は破壊数に応じて）
+        triggerShake(effects, Math.min(3 + destroyedCount, 8));
       }
       prevBricksCount = currentBricksCount;
+    };
+
+    /**
+     * キャンバス座標をゲーム論理座標に変換
+     * @description キャンバスがリサイズされても論理座標系（400x640）は固定
+     */
+    const getGameX = (): number => {
+      const config = useBreakoutStore.getState().game.config;
+      // キャンバスサイズに対する論理座標の比率
+      const scaleX = config.canvasWidth / p.width;
+      return p.mouseX * scaleX;
     };
 
     /**
@@ -449,7 +536,7 @@ export const createBreakoutSketch = (): P5Sketch => {
       const game = useBreakoutStore.getState().game;
       if (game.state !== 'playing' && game.state !== 'ready') return;
 
-      const targetX = p.mouseX;
+      const targetX = getGameX();
       useBreakoutStore.getState().handlePointerMove(targetX, 0, 1);
     };
 
@@ -460,7 +547,7 @@ export const createBreakoutSketch = (): P5Sketch => {
       const game = useBreakoutStore.getState().game;
       if (game.state !== 'playing' && game.state !== 'ready') return;
 
-      const targetX = p.mouseX;
+      const targetX = getGameX();
       useBreakoutStore.getState().handlePointerMove(targetX, 0, 1);
       return false; // デフォルト動作を防止
     };

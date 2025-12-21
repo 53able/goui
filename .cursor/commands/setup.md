@@ -87,6 +87,13 @@ pnpm build
 ### 方法1: 個別起動（推奨）
 
 ```bash
+# 各アプリのSSRサーバーを個別に起動
+cd apps/アプリ名 && pnpm dev:api
+```
+
+**具体例:**
+
+```bash
 # ターミナル1: Webアプリ（SSRサーバー）
 cd apps/web && pnpm dev:api      # http://localhost:3000 ← メインアクセスURL
 
@@ -103,6 +110,12 @@ cd apps/playground && pnpm dev:api  # http://localhost:3002 ← メインアク�
 
 ```bash
 # 特定のアプリのSSRサーバーを起動
+pnpm --filter @myorg/アプリ名 dev:api
+```
+
+**具体例:**
+
+```bash
 pnpm --filter @myorg/web dev:api
 pnpm --filter @myorg/admin dev:api
 ```
@@ -157,6 +170,12 @@ curl -s http://localhost:3000 | grep -o '<div id="root">.*</div>' | head -1
 pnpm build
 
 # 特定のアプリのみビルド
+pnpm build --filter=@myorg/アプリ名
+```
+
+**具体例:**
+
+```bash
 pnpm build --filter=@myorg/web
 ```
 
@@ -170,6 +189,12 @@ pnpm build --filter=@myorg/web
 
 ```bash
 # 特定のアプリの本番サーバーを起動
+pnpm --filter @myorg/アプリ名 start
+```
+
+**具体例:**
+
+```bash
 pnpm --filter @myorg/web start
 pnpm --filter @myorg/admin start
 pnpm --filter @myorg/playground start
@@ -245,32 +270,96 @@ VERCEL_ORG_ID=$ORG_ID VERCEL_PROJECT_ID=$PROJECT_ID vercel deploy --prod --yes
 
 各アプリディレクトリで個別にリンクする方法。
 
-#### @myorg/web のデプロイ
+#### Vercel CLIのインストール
 
 ```bash
-# Vercel CLIのインストール（未インストールの場合）
+# グローバルインストール（未インストールの場合）
 pnpm add -g vercel
 
-# プロジェクトをVercelにリンク
-cd apps/web
-vercel link
-
-# 環境変数の設定（方法1: 対話式で1つずつ）
-vercel env add OPENAI_API_KEY
-vercel env add BASIC_AUTH_USERNAME
-vercel env add BASIC_AUTH_PASSWORD
-
-# デプロイ
-vercel deploy
+# ログイン
+vercel login
 ```
 
-#### @myorg/admin のデプロイ
+#### 方法A: ルートから `--cwd` オプションで実行（推奨）
+
+ルートディレクトリから各アプリを個別にリンク・デプロイする方法。ディレクトリを移動せずに操作できる。
 
 ```bash
-cd apps/admin
-vercel link
-vercel deploy
+# Step 1: アプリをVercelプロジェクトにリンク（初回のみ）
+vercel link --cwd apps/アプリ名 --project=プロジェクト名 --yes
+
+# Step 2: デプロイ
+vercel --cwd apps/アプリ名 --yes        # プレビューデプロイ
+vercel --cwd apps/アプリ名 --prod --yes # 本番デプロイ
 ```
+
+**具体例:**
+
+```bash
+# 例: web アプリをリンク & デプロイ
+vercel link --cwd apps/web --project=myorg-web --yes
+vercel --cwd apps/web --prod --yes
+```
+
+> ⚠️ **注意**: ルートに `.vercel/project.json` は不要。各アプリディレクトリ（`apps/xxx/.vercel/`）にのみ作成される。
+
+#### 方法B: 各ディレクトリに移動して実行
+
+```bash
+# プロジェクトをVercelにリンク
+cd apps/アプリ名
+vercel link
+
+# デプロイ
+vercel          # プレビューデプロイ
+vercel --prod   # 本番デプロイ
+```
+
+---
+
+### 🚀 強制デプロイ
+
+`ignoreCommand` で変更がないと判定されてもデプロイしたい場合の方法。
+
+#### 基本: CLI で `--force` フラグを使用（推奨）
+
+```bash
+# プレビュー環境へ強制デプロイ
+vercel --cwd apps/アプリ名 --force --yes
+
+# 本番環境へ強制デプロイ
+vercel --cwd apps/アプリ名 --prod --force --yes
+
+# ビルドキャッシュも無視して完全再ビルド
+vercel --cwd apps/アプリ名 --prod --force --no-cache --yes
+```
+
+**具体例:**
+
+```bash
+# 例: web アプリを強制デプロイ
+vercel --cwd apps/web --prod --force --yes
+```
+
+#### 代替方法1: Git経由で空コミット
+
+```bash
+# 空コミットを作成してプッシュ
+git commit --allow-empty -m "chore: force deploy"
+git push origin main  # または feature ブランチ
+```
+
+> 💡 空コミットなら `ignoreCommand` の変更チェックを回避でき、Git履歴にデプロイ記録が残る。
+
+#### 代替方法2: Vercel Dashboard から
+
+1. Vercel Dashboard を開く
+2. プロジェクトを選択
+3. **Deployments** タブへ
+4. 右上の **"Redeploy"** ボタンをクリック
+5. オプションで **"Use existing Build Cache"** のチェックを外す
+
+> ⚠️ **基本はCLI推奨**: Dashboard は緊急時のみ使用し、通常はCLIまたはGit経由を使用すること。
 
 ---
 
@@ -281,13 +370,22 @@ vercel deploy
 > ⚠️ **セキュリティ注意**: デフォルト値 `admin/admin` は開発用です。本番環境では必ず変更してください！
 
 ```bash
+# アプリディレクトリへ移動して環境変数を設定
+cd apps/アプリ名
+
 # Basic認証の環境変数を設定
 vercel env add BASIC_AUTH_USERNAME production
 # → 入力: your_secure_username
 
 vercel env add BASIC_AUTH_PASSWORD production
 # → 入力: your_secure_password
+
+# AI APIキーを設定
+vercel env add OPENAI_API_KEY production
+# → 入力: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+> 💡 **--cwd オプションでの代替方法**: `vercel --cwd apps/アプリ名 env add KEY production` も可能。
 
 #### 環境変数の一括設定（.env から Vercel へ）
 
@@ -334,10 +432,12 @@ curl -X PATCH "https://api.vercel.com/v9/projects/{projectId}?teamId={teamId}" \
 
 | 設定項目 | 値 |
 |---------|-----|
-| **Root Directory** | `apps/web` または `apps/admin` |
-| **Build Command** | `cd ../.. && pnpm turbo build --filter=@myorg/xxx` |
+| **Root Directory** | `apps/アプリ名` |
+| **Build Command** | `cd ../.. && pnpm turbo build --filter=@myorg/アプリ名` |
 | **Output Directory** | `dist` |
 | **Install Command** | `cd ../.. && pnpm install` |
+
+> 💡 `vercel.json` に設定済みの場合、Dashboard設定は不要です。
 
 ### vercel.json の設定内容
 
@@ -666,17 +766,22 @@ pnpm --filter @myorg/新アプリ dev
 | カテゴリ | コマンド | 用途 |
 |---------|---------|------|
 | **Setup** | `pnpm install` | 全ワークスペースの依存関係インストール |
+| **Setup** | `pnpm add -g vercel` | Vercel CLIのグローバルインストール |
 | **Dev** | `pnpm dev` | 全アプリのSSRサーバーを同時起動（Turborepo） |
-| **Dev** | `pnpm --filter @myorg/web dev:api` | 特定アプリのSSRサーバーを起動 |
-| **Dev** | `pnpm --filter @myorg/web dev` | Vite Devのみ起動（CSR、通常は不要） |
+| **Dev** | `pnpm --filter @myorg/xxx dev:api` | 特定アプリのSSRサーバーを起動 |
+| **Dev** | `pnpm --filter @myorg/xxx dev` | Vite Devのみ起動（CSR、通常は不要） |
 | **Build** | `pnpm build` | 全パッケージビルド（クライアント + SSRバンドル） |
-| **Build** | `pnpm build --filter=@myorg/web` | 特定アプリのみビルド |
+| **Build** | `pnpm build --filter=@myorg/xxx` | 特定アプリのみビルド |
 | **Quality** | `pnpm typecheck` | 型チェック（全パッケージ） |
 | **Quality** | `pnpm lint` | Linting（全パッケージ） |
 | **Quality** | `pnpm test` | テスト実行（全パッケージ） |
-| **Production** | `pnpm --filter @myorg/web start` | 本番SSRサーバー起動（セルフホスト） |
-| **Vercel** | `vercel dev --cwd apps/web` | Vercelローカルプレビュー |
-| **Vercel** | `git push origin main` | Vercel自動デプロイ（Git連携推奨） |
+| **Production** | `pnpm --filter @myorg/xxx start` | 本番SSRサーバー起動（セルフホスト） |
+| **Vercel** | `vercel login` | Vercelにログイン |
+| **Vercel** | `vercel link --cwd apps/xxx` | プロジェクトをVercelにリンク |
+| **Vercel** | `vercel --cwd apps/xxx` | プレビューデプロイ（CLI） |
+| **Vercel** | `vercel --cwd apps/xxx --prod` | 本番デプロイ（CLI） |
+| **Vercel** | `vercel --cwd apps/xxx --force --prod` | 強制デプロイ（CLI） |
+| **Vercel** | `git push origin main` | Vercel自動デプロイ（Git連携） |
 
 ---
 

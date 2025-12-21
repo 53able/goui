@@ -1,11 +1,13 @@
 /**
- * 描画モジュールのエクスポート
+ * 描画モジュールのエクスポート 🎄 クリスマス仕様
  */
 
 export {
   drawBackground,
-  drawGrid,
+  drawChristmasLights,
   drawScanlines,
+  drawSnowflakes,
+  drawSnowMountains,
   drawStars,
 } from './drawBackground.js';
 export { type DrawBallOptions, drawBall } from './drawBall.js';

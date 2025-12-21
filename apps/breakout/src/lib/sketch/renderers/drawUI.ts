@@ -1,5 +1,5 @@
 /**
- * UI描画モジュール
+ * UI描画モジュール 🎄 クリスマス仕様
  * @description 2DオーバーレイUI（スコアポップアップ、コンボ、パワーアップなど）
  */
 
@@ -85,7 +85,7 @@ export const drawItemIcons = (
 };
 
 /**
- * スコアポップアップを描画・更新
+ * スコアポップアップを描画・更新 🎄
  */
 export const drawScorePopups = (
   // biome-ignore lint/suspicious/noExplicitAny: p5.Graphics型
@@ -113,11 +113,12 @@ export const drawScorePopups = (
     buffer.textAlign(p.CENTER, p.CENTER);
     buffer.textStyle(p.BOLD);
 
-    buffer.fill(255, 200, 50, popup.life * 255);
+    // クリスマスゴールド ⭐
+    buffer.fill(255, 215, 0, popup.life * 255);
 
     const text =
       popup.combo > 1
-        ? `+${popup.score * popup.combo} x${popup.combo}!`
+        ? `+${popup.score * popup.combo} ⭐x${popup.combo}!`
         : `+${popup.score}`;
     buffer.text(text, 0, 0);
 
@@ -126,7 +127,7 @@ export const drawScorePopups = (
 };
 
 /**
- * コンボ表示を描画
+ * コンボ表示を描画 🌟
  */
 export const drawComboDisplay = (
   // biome-ignore lint/suspicious/noExplicitAny: p5.Graphics型
@@ -143,9 +144,10 @@ export const drawComboDisplay = (
   buffer.textAlign(p.CENTER, p.CENTER);
   buffer.textStyle(p.BOLD);
 
-  buffer.fill(255, 150 + combo.count * 20, 50);
+  // クリスマスゴールド ⭐
+  buffer.fill(255, 215, 0);
 
-  buffer.text(`${combo.count} COMBO!`, canvasWidth / 2, canvasHeight - 90);
+  buffer.text(`⭐ ${combo.count} COMBO! ⭐`, canvasWidth / 2, canvasHeight - 90);
 
   buffer.pop();
 };
@@ -195,7 +197,7 @@ export const drawPowerUpStatus = (
 };
 
 /**
- * アイテム収集エフェクトを描画・更新
+ * アイテム収集エフェクトを描画・更新 🎁
  */
 export const drawItemCollectEffects = (
   // biome-ignore lint/suspicious/noExplicitAny: p5.Graphics型
@@ -207,7 +209,7 @@ export const drawItemCollectEffects = (
 ): void => {
   for (let i = itemCollectEffects.length - 1; i >= 0; i--) {
     const effect = itemCollectEffects[i];
-    effect.life -= 0.015; // ゆっくり消える
+    effect.life -= 0.015;
     effect.scale = p.min(effect.scale + 0.15, 1.2);
 
     if (effect.life <= 0) {
@@ -218,12 +220,12 @@ export const drawItemCollectEffects = (
     const effectColor = ITEM_COLORS[effect.type];
     const icon = ITEM_ICONS[effect.type];
     const name = ITEM_NAMES[effect.type];
-    const yOffset = (1 - effect.life) * -30; // 上に浮かぶ
+    const yOffset = (1 - effect.life) * -30;
 
-    // 背景（半透明の帯）
+    // 背景（冬の夜空風）
     buffer.push();
     buffer.noStroke();
-    buffer.fill(0, 0, 0, effect.life * 150);
+    buffer.fill(20, 30, 50, effect.life * 180);
     buffer.rectMode(p.CENTER);
     buffer.rect(canvasWidth / 2, canvasHeight / 2 - 50 + yOffset, 220, 60, 10);
     buffer.pop();
@@ -238,7 +240,7 @@ export const drawItemCollectEffects = (
 
     // 効果名
     buffer.push();
-    buffer.textSize(22 * effect.scale);
+    buffer.textSize(20 * effect.scale);
     buffer.textAlign(p.LEFT, p.CENTER);
     buffer.textStyle(p.BOLD);
     buffer.fill(effectColor.r, effectColor.g, effectColor.b, effect.life * 255);
@@ -248,7 +250,7 @@ export const drawItemCollectEffects = (
 };
 
 /**
- * ゲームオーバー/勝利オーバーレイを描画
+ * ゲームオーバー/勝利オーバーレイを描画 🎄
  */
 export const drawGameEndOverlay = (
   // biome-ignore lint/suspicious/noExplicitAny: p5.Graphics型
@@ -261,7 +263,8 @@ export const drawGameEndOverlay = (
 ): void => {
   if (state !== 'gameOver' && state !== 'victory') return;
 
-  buffer.fill(0, 0, 0, 220);
+  // 冬の夜空風オーバーレイ
+  buffer.fill(15, 25, 45, 220);
   buffer.rect(0, 0, canvasWidth, canvasHeight);
 
   const isVictory = state === 'victory';
@@ -272,23 +275,23 @@ export const drawGameEndOverlay = (
   buffer.textSize(36);
 
   if (isVictory) {
-    buffer.fill(100, 255, 150);
+    buffer.fill(255, 215, 0); // 金色 ⭐
   } else {
-    buffer.fill(255, 100, 100);
+    buffer.fill(200, 50, 50); // 赤
   }
 
   buffer.text(
-    isVictory ? '🎉 VICTORY!' : '💀 GAME OVER',
+    isVictory ? '🎄 Merry Christmas! 🎄' : '⛄ また挑戦してね！',
     canvasWidth / 2,
     canvasHeight / 2 - 50,
   );
 
   buffer.textSize(28);
-  buffer.fill(255, 220, 100);
+  buffer.fill(255, 215, 0);
   buffer.text(`Score: ${score}`, canvasWidth / 2, canvasHeight / 2 + 10);
 
   buffer.textSize(18);
-  buffer.fill(0, 255, 255);
+  buffer.fill(200, 230, 255);
   buffer.text('タップしてリトライ', canvasWidth / 2, canvasHeight / 2 + 60);
 
   buffer.pop();
@@ -304,20 +307,20 @@ export const drawPausedOverlay = (
   canvasWidth: number,
   canvasHeight: number,
 ): void => {
-  buffer.fill(0, 0, 0, 150);
+  buffer.fill(15, 25, 45, 180);
   buffer.rect(0, 0, canvasWidth, canvasHeight);
 
   buffer.push();
   buffer.textAlign(p.CENTER, p.CENTER);
   buffer.textStyle(p.BOLD);
   buffer.textSize(36);
-  buffer.fill(255, 220, 100);
+  buffer.fill(255, 215, 0); // 金色
   buffer.text('⏸ PAUSED', canvasWidth / 2, canvasHeight / 2);
   buffer.pop();
 };
 
 /**
- * 準備画面を描画
+ * 準備画面を描画 🎄
  */
 export const drawReadyScreen = (
   // biome-ignore lint/suspicious/noExplicitAny: p5.Graphics型
@@ -329,8 +332,8 @@ export const drawReadyScreen = (
   buffer.push();
   buffer.textAlign(p.CENTER, p.CENTER);
   buffer.textStyle(p.BOLD);
-  buffer.textSize(20);
-  buffer.fill(0, 255, 255);
-  buffer.text('タップしてスタート', canvasWidth / 2, canvasHeight / 2);
+  buffer.textSize(22);
+  buffer.fill(255, 215, 0); // 金色
+  buffer.text('🎄 タップしてスタート 🎄', canvasWidth / 2, canvasHeight / 2);
   buffer.pop();
 };

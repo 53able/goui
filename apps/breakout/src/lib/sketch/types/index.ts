@@ -89,6 +89,36 @@ export interface Scanline {
 }
 
 /**
+ * 雪の結晶 ❄️ クリスマス仕様
+ */
+export interface Snowflake {
+  x: number;
+  y: number;
+  z: number;
+  size: number;
+  rotationSpeed: number;
+  rotation: number;
+  swayOffset: number;
+  swaySpeed: number;
+  fallSpeed: number;
+  /** 雪の種類: dot=小さな点, hex=六角形, crystal=結晶 */
+  type: 'dot' | 'hex' | 'crystal';
+  /** キラキラの位相 */
+  sparklePhase: number;
+}
+
+/**
+ * イルミネーションライト 💡 クリスマス仕様
+ */
+export interface ChristmasLight {
+  x: number;
+  y: number;
+  color: RGB;
+  phase: number;
+  size: number;
+}
+
+/**
  * アイテム収集エフェクト（画面中央に効果名表示）
  */
 export interface ItemCollectEffect {
@@ -98,15 +128,15 @@ export interface ItemCollectEffect {
 }
 
 /**
- * ボール出現演出タイプ
- * - beam: パドルから光の柱がチャージしてボール形成
- * - impact: 衝撃波と共にドンと出現
- * - lightning: 稲妻が落ちてボール出現
+ * ボール出現演出タイプ 🎄 クリスマス仕様
+ * - star: 星が集まってオーナメント形成 ⭐
+ * - snow: 雪が渦を巻いて形成 ❄️
+ * - bell: ベルの音と共に出現 🔔
  */
-export type SpawnEffectType = 'beam' | 'impact' | 'lightning';
+export type SpawnEffectType = 'star' | 'snow' | 'bell';
 
 /**
- * ボール出現演出の状態
+ * ボール出現演出の状態 🎄 クリスマス仕様
  */
 export interface BallSpawnEffect {
   /** 演出タイプ */
@@ -116,8 +146,8 @@ export interface BallSpawnEffect {
   /** ボール位置 */
   ballX: number;
   ballY: number;
-  /** 稲妻用のジグザグポイント */
-  lightningPoints: Array<{ x: number; y: number }>;
+  /** 星が集まる軌跡用ポイント（starタイプ用） */
+  starPoints: Array<{ x: number; y: number; angle: number }>;
   /** 演出が完了したか */
   completed: boolean;
 }
@@ -148,7 +178,7 @@ export interface ComboState {
 }
 
 /**
- * エフェクトマネージャーの状態
+ * エフェクトマネージャーの状態 🎄 クリスマス仕様
  */
 export interface EffectState {
   particles: Particle3D[];
@@ -157,6 +187,10 @@ export interface EffectState {
   trail: TrailPoint[];
   stars: Star[];
   scanlines: Scanline[];
+  /** 雪の結晶 ❄️ */
+  snowflakes: Snowflake[];
+  /** イルミネーションライト 💡 */
+  christmasLights: ChristmasLight[];
   itemCollectEffects: ItemCollectEffect[];
   shake: ShakeState;
   glitch: GlitchState;

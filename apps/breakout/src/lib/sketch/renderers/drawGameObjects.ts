@@ -1,6 +1,6 @@
 /**
- * ゲームオブジェクト描画モジュール
- * @description ブロック、パドル、アイテムの3D描画
+ * ゲームオブジェクト描画モジュール 🎄 クリスマス仕様
+ * @description プレゼント箱、サンタのソリ、アイテムの3D描画
  */
 
 import type { P5Instance } from '@/components/P5Canvas';
@@ -11,12 +11,12 @@ import { ITEM_COLORS } from '../utils/itemConstants.js';
 import { toWebGL } from '../utils/webglUtils.js';
 
 /**
- * ブロックを描画（3Dボックス）
+ * プレゼント箱（ブロック）を描画 🎁
  */
 export const drawBricks = (
   p: P5Instance,
   bricks: Brick[],
-  glitch: GlitchState,
+  _glitch: GlitchState,
   canvasWidth: number,
   canvasHeight: number,
 ): void => {
@@ -30,29 +30,54 @@ export const drawBricks = (
       canvasHeight,
     );
 
-    // グリッチ時のRGBずれ
-    const chromaticOffset = glitch.chromatic * (p.random() > 0.5 ? 1 : -1);
-
-    p.push();
-    p.translate(bx + chromaticOffset * 0.5, by, 0);
-
-    // 立体ブロック
     const brickRgb = parseHslColor(brick.color) || {
       r: 255,
       g: 255,
       b: 255,
     };
+
+    // 箱本体
+    p.push();
+    p.translate(bx, by, 0);
     p.fill(brickRgb.r, brickRgb.g, brickRgb.b);
-    p.stroke(255, 255, 255, 100);
+    p.stroke(255, 255, 255, 80);
     p.strokeWeight(1);
-    p.box(brick.width - 2, brick.height - 2, 15);
+    p.box(brick.width - 2, brick.height - 2, 18);
 
     // 上面ハイライト
     p.push();
-    p.translate(0, 0, 8);
-    p.fill(255, 255, 255, 80);
+    p.translate(0, 0, 10);
+    p.fill(255, 255, 255, 60);
     p.noStroke();
     p.plane(brick.width - 6, brick.height - 6);
+    p.pop();
+
+    // リボン（縦）🎀
+    const ribbonColor =
+      brick.row % 2 === 0
+        ? { r: 255, g: 215, b: 0 } // 金リボン
+        : { r: 255, g: 255, b: 255 }; // 白リボン
+
+    p.fill(ribbonColor.r, ribbonColor.g, ribbonColor.b, 230);
+    p.noStroke();
+
+    // 縦リボン
+    p.push();
+    p.translate(0, 0, 10);
+    p.plane(6, brick.height - 2);
+    p.pop();
+
+    // 横リボン
+    p.push();
+    p.translate(0, 0, 10);
+    p.plane(brick.width - 2, 6);
+    p.pop();
+
+    // リボンの結び目（中央の丸）
+    p.push();
+    p.translate(0, 0, 12);
+    p.fill(ribbonColor.r, ribbonColor.g, ribbonColor.b);
+    p.sphere(5);
     p.pop();
 
     p.pop();
@@ -60,7 +85,7 @@ export const drawBricks = (
 };
 
 /**
- * パドルを描画（3D）
+ * サンタのソリ（パドル）を描画 🛷
  */
 export const drawPaddle = (
   p: P5Instance,
@@ -77,18 +102,44 @@ export const drawPaddle = (
   p.push();
   p.translate(px, py, 0);
 
-  // パドル本体
-  p.fill(0, 255, 255);
-  p.stroke(255, 255, 255, 150);
+  // ソリ本体（赤）
+  p.fill(180, 30, 30); // 深い赤
+  p.stroke(100, 20, 20);
   p.strokeWeight(2);
-  p.box(paddle.width, paddle.height, 12);
+  p.box(paddle.width, paddle.height, 15);
 
-  // パドル装飾
+  // ソリの縁取り（金色）
   p.push();
-  p.translate(0, 0, 7);
-  p.fill(255, 255, 255, 100);
+  p.translate(0, -paddle.height / 2 - 2, 0);
+  p.fill(255, 215, 0);
   p.noStroke();
-  p.plane(paddle.width - 20, 3);
+  p.box(paddle.width + 4, 4, 18);
+  p.pop();
+
+  // ソリのカーブ（左端）
+  p.push();
+  p.translate(-paddle.width / 2 - 5, 0, 0);
+  p.fill(139, 69, 19); // 茶色（木）
+  p.noStroke();
+  p.rotateZ(0.3);
+  p.box(15, 8, 12);
+  p.pop();
+
+  // ソリのカーブ（右端）
+  p.push();
+  p.translate(paddle.width / 2 + 5, 0, 0);
+  p.fill(139, 69, 19);
+  p.noStroke();
+  p.rotateZ(-0.3);
+  p.box(15, 8, 12);
+  p.pop();
+
+  // 装飾ライン（金）
+  p.push();
+  p.translate(0, 0, 9);
+  p.fill(255, 215, 0, 180);
+  p.noStroke();
+  p.plane(paddle.width - 30, 3);
   p.pop();
 
   p.pop();
